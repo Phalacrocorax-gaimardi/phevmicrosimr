@@ -1,7 +1,6 @@
 # phevmicrosimr
 
 <!-- badges: start -->
-use_lifecycle_badge("stable")
 <!-- badges: end -->
 
 This is an agent-based microsimulator for ZEV uptake. 
@@ -14,13 +13,22 @@ install_github("Phalacrocorax-gaimardi/microsim")
 install_github("Phalacrocorax-gaimardi/phevmicrosimr")
 ```
 
-## Use
+## Usage
 ```
 runABM(scenario=scenario_1,Nrun=8)
 ```
 Use `help(runABM)` for more details.
 
 ## Data
+
+```
+#fleet data
+data(fleet)
+#agent characteristics
+data(agents_init)
+#techno-economic scenario
+data(scenario_1)
+```
 
 ## Background
 

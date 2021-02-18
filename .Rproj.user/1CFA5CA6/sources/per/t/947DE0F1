@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1607180520505.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "14|40|23|0|\n349|58|361|0|\n751|33|758|2|\n",
+    "hash" : "1444045856",
+    "id" : "947DE0F1",
+    "lastKnownWriteTime" : 1612269699,
+    "last_content_update" : 1612358297664,
+    "path" : "C:/Users/Joe/pkgs/phevmicrosimr/R/technology.R",
+    "project_path" : "R/technology.R",
+    "properties" : {
+        "cursorPosition" : "784,64",
+        "scrollLine" : "0",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

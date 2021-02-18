@@ -1,0 +1,854 @@
+#results for paper
+library(microsim)
+library(evmicrosimr)
+library(patchwork)
+library(tidyverse)
+library(lubridate)
+library(ggthemes)
+library(patchwork)
+
+
+load("C:/Users/Joe/pkgs/evmicrosimr/R/sysdata.rda")
+y_zero <- lubridate::ymd(paste(year_zero,1,1))
+
+date_tab <- tibble(t=1:432)
+date_tab <- date_tab %>% mutate(date=y_zero+months(t-1))
+
+#run simulations
+scenario_1 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=2)
+
+scenario_1_EU_ref <- scenario_1 %>% mutate(value=replace(value, parameter=="new_icev_ban_year",2050))
+
+
+
+abm <- runABM(scenario_1_EU_ref,50)
+#saveRDS(abm,"~/Policy/AgentBasedModels/Runs/scenario_1_EU_ref.RData")
+abm <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_1_EU_ref.RData")
+
+abm.e <- abm[[1]] %>% group_by(t,simulation) %>% dplyr::summarise(e=mean(emissions) , tCO2=sum(emissions*mileage_vals[qev34])/12/1e+6)
+abm.e <- distinct(abm.e)
+abm.e <- inner_join(abm.e,date_tab) %>% distinct()
+test <- abm.e %>% group_by(date) %>% summarise(e=mean(e),tCO2=mean(tCO2))%>% distinct() %>% group_by(year=year(date)) %>% summarise(e=mean(e),tCO2=sum(tCO2)/924)
+
+test <- test %>% filter(year %in% seq(2010,2050,by=5))
+
+write_csv(test,"~/Policy/CAMG/EUReference/ucd_2.csv")
+
+#abm <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_3_Nrun=100.RData")
+getEVAdoption1(abm)
+
+abm <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_2_Nrun=100.RData")
+
+g2 <-graph_adoption(abm,yscale="sqrt",gtitle="Scenario 2",galpha = 0.1)
+saveRDS(g2,"~/Policy/AgentBasedModels/Runs/scenario_2_adoption.RData")
+
+g1 <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_1_adoption.RData")
+g2 <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_2_adoption.RData")
+g3 <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_3_adoption.RData")
+g1+g2+g3
+
+getEVAdoption1(abm) %>% group_by(date) %>%  filter(date=="2025-12-1") %>% summarise(mean=mean(predicted), sd = sd(predicted))
+
+#sensitivity analysis grant phase_out
+scen <- scenario_2
+
+for(year in 2022:2025){
+  scen <- scen %>% mutate(value=replace(value, parameter=="grant_phaseout_start",year))
+  scen <- scen %>% mutate(value=replace(value, parameter=="grant_phaseout_end",year+1))
+  
+
+}
+
+#########################
+#run vkt sensitivity
+#########################
+
+scenario_2 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=3)
+
+scen <- scenario_2
+i <- 0
+vkts <- seq(0.15,0.25,by=0.05)
+abm_vkt <- vector("list",length(vkts))
+
+
+for(vkt in vkts){
+  print(vkt)
+  scen_v <- scen %>% mutate(value=replace(value, parameter=="VKT_high_2030",vkt))
+  scen_v <- scen_v %>% mutate(value=replace(value, parameter=="VKT_low_2030",vkt))
+  abm <- runABM(scen_v,40,simulation_end = 2040)[[1]]
+  abm$vkt <- vkt
+  abm <- abm %>% select(ID,vkt,simulation,t,fuel,qev32,qev34,emissions,transaction,price,price_exg)
+  i <- i+1
+  abm_vkt[[i]] <- abm
+  rm(abm)
+  gc()
+}
+abm_vkt <- data.table::rbindlist(abm_vkt)
+abm_vkt <- as_tibble(abm_vkt)
+#saveRDS(abm_vkt,"~/Policy/AgentBasedModels/Runs/vkt_sensitivity_20_scenario_2.RData")
+abm_vkt <- readRDS("~/Policy/AgentBasedModels/Runs/vkt_sensitivity_20_scenario_2.Rdata")
+#abm_vkt <- bind_rows(abm_vkt0,abm_vkt)
+
+date_tab <- tibble(t=1:432)
+date_tab <- date_tab %>% mutate(date=y_zero+months(t-1))
+
+#2030 adoption
+test <- abm_vkt %>% group_by(vkt,simulation,t,fuel) %>% filter(fuel=="EV") %>% summarise(n=n()/924)
+test <- inner_join(test,date_tab)
+g1 <- test %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(100*vkt),100*n,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="Identity") + theme_tufte()
+g1 <- g1+labs(x="% VKT reduction",y="%", title="BEV Uptake") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g1 <- g1+ theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g1 <- g1+theme(legend.title = element_blank())
+#saveRDS(g1,"~/Policy/AgentBasedModels/Runs/uptakevsVKT.RData")
+g1
+
+vkt <- test %>% filter(date=="2030-12-01") %>% group_by(vkt) %>% summarise(mean=mean(n),sd=sd(n))
+g <- ggplot(vkt,aes(100*vkt,100*mean)) + geom_point() + geom_errorbar(aes(ymin=100*mean-100*sd,ymax=100*mean+100*sd)) + theme_tufte()
+g + labs(x="VKT reduction %",y="EV uptake %")
+lm(mean~vkt,vkt) #0.2% reduction in uptake for every 1% VKt reduction: scenario 2 uptake=39%-0.2*VKT reduction
+#emissions
+vkt_fact <- function(vkt,yeartime){
+  #
+  1-approx(x=c(2021,2030),y=c(0,vkt),xout=yeartime,rule=2)$y
+  
+  
+  
+} 
+Nt <- max(abm_vkt$t)
+vkt_tab <- expand.grid(vkt=seq(0,0.25,by=0.05),t=1:Nt)
+vkt_tab <- vkt_tab %>% rowwise() %>% dplyr::mutate(vkt_fact=vkt_fact(vkt,2015+(t-1)/12))
+
+abm_vkt <- inner_join(abm_vkt,vkt_tab)
+
+abm.e <- abm_vkt %>% group_by(vkt,vkt_fact,t,simulation) %>% dplyr::summarise(vkt_fact=vkt_fact,e=mean(emissions) , tCO2=vkt_fact*sum(emissions*mileage_vals[qev34])/12/1e+6)
+abm.e <- distinct(abm.e)
+abm.e <- inner_join(abm.e,date_tab)
+abm.e <- abm.e %>% group_by(vkt,simulation) %>% arrange(date) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+
+#
+abm.icev <- abm_vkt %>% filter(fuel=="fossil") %>% group_by(vkt,vkt_fact,t,simulation) %>% dplyr::summarise(vkt_fact=vkt_fact,e=mean(emissions) , tCO2=vkt_fact*mean(emissions*mileage_vals[qev34])/12/1e+6)
+abm.icev <- distinct(abm.icev)
+abm.icev <- inner_join(abm.icev,date_tab)
+abm.icev <- abm.icev %>% group_by(vkt,simulation) %>% arrange(date) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+
+
+#co2 emissions in 2030
+g2 <- abm.e %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(vkt),cumulative_tCO2*2.1/924, fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="Identity") + theme_tufte()
+g2 <- g2 + labs(x="% VKT reduction",y="MtCO2",title="Cumulative Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g2 <- g2+ theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g2 <- g2+theme(legend.title = element_blank())
+g2
+
+g3 <- abm.e %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(vkt),e,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="Identity") + theme_tufte()
+g3 <- g3 + labs(x="% VKT reduction",y="gCO2/km",title="Fleet Specific Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g3 <- g3+ theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g3 <- g3+theme(legend.title = element_blank())
+g3
+
+
+g4 <- abm.icev %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(vkt),e,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="Identity") + theme_tufte()
+g4 <- g4 + labs(x="% VKT reduction",y="gCO2/km",title="ICEV Specific Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g4 <- g4 + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g4 <- g4+theme(legend.title = element_blank())
+g4
+
+(g1+g2)/(g3+g4)
+#ggsave("~/Policy/AgentBasedModels/Runs/vktpolicy.png")
+
+
+#########################
+# ICEV ban year sensitivity
+#########################
+scenario_1 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=2)
+
+scen <- scenario_1
+i <- 0
+banyears <- seq(2026,2038,by=2)
+abm_ban <- vector("list",length(banyears))
+
+for(banyear in banyears){
+  print(banyear)
+  scen_b <- scen %>% mutate(value=replace(value, parameter=="new_icev_ban_year",banyear))
+  abm <- runABM(scen_b,20,simulation_end = 2040)[[1]]
+  abm$banyear <- banyear
+  abm <- abm %>% select(ID,banyear,simulation,t,fuel,qev32,qev34,emissions,transaction,price,price_exg)
+  i <- i+1
+  abm_ban[[i]] <- abm
+  rm(abm)
+  gc()
+  
+}
+abm_ban <- data.table::rbindlist(abm_ban)
+abm_ban <- as_tibble(abm_ban)
+#saveRDS(abm_ban,"~/Policy/AgentBasedModels/Runs/icevbanyear_sensitivity_20_scenario_1.RData")
+#2030 adoption
+test <- abm_ban %>% group_by(banyear,simulation,t,fuel) %>% filter(fuel=="EV") %>% summarise(n=n()/924)
+test <- inner_join(test,date_tab)
+g1 <- test %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(banyear),100*n,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g1 <- g1+labs(x="ICEV ban year",y="%",title="BEV uptake") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g1 <- g1+theme(legend.title = element_blank())
+#saveRDS(g1,"~/Policy/AgentBasedModels/Runs/uptakevsVKT.RData")
+g1
+
+abm.e <- abm_ban %>% group_by(banyear,t,simulation) %>% dplyr::summarise(e=mean(emissions) , tCO2=sum(emissions*mileage_vals[qev34])/12/1e+6)
+abm.e <- distinct(abm.e)
+abm.e <- inner_join(abm.e,date_tab)
+abm.e <- abm.e %>% group_by(banyear,simulation) %>% arrange(date) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+
+#co2 emissions in 2030
+g2 <- abm.e %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(banyear),cumulative_tCO2*2.1/924,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g2 <- g2 + labs(x="ICEV ban year",y="MtCO2",title="Cumulative Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g2 <- g2 +theme(legend.title = element_blank())
+g2
+
+g1+g2
+ggsave("~/Policy/AgentBasedModels/Runs/icevbans_scenario_1.png")
+
+
+#########################
+# Subsidy Phaseout
+#########################
+#impact of 
+scenario_2 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=3)
+
+scen <- scenario_2
+i <- 0
+#both rebate and grant are phased out within a year
+phaseout_years <- 2024.5
+abm_subsidy <- vector("list",1)
+
+for(p_year in phaseout_years){
+  print(p_year)
+  scen_p <- scen %>% mutate(value=replace(value, parameter=="grant_phaseout_start",p_year))
+  scen_p <- scen_p %>% mutate(value=replace(value, parameter=="grant_phaseout_end",p_year+1))
+  scen_p <- scen_p %>% mutate(value=replace(value, parameter=="lower_rebate_phaseout_start",p_year))
+  scen_p <- scen_p %>% mutate(value=replace(value, parameter=="lower_rebate_phaseout_end",p_year+1))
+  scen_p <- scen_p %>% mutate(value=replace(value, parameter=="upper_rebate_phaseout_start",p_year))
+  scen_p <- scen_p %>% mutate(value=replace(value, parameter=="upper_rebate_phaseout_end",p_year+1))
+  abm <- runABM(scen_p,100,simulation_end = 2040)[[1]]
+  abm$p_year <- p_year
+  abm <- abm %>% select(ID,p_year,simulation,t,fuel,qev32,qev34,emissions,transaction,price,price_exg)
+  i <- i+1
+  abm_subsidy[[i]] <- abm
+}
+
+abm_subsidy <- data.table::rbindlist(abm_subsidy)
+abm_subsidy <- as_tibble(abm_subsidy)
+saveRDS(abm_subsidy,"~/Policy/AgentBasedModels/Runs/subsidy_phaseout_2024.5_scenario2.RData")
+
+abm_subsidy0 <- readRDS("~/Policy/AgentBasedModels/Runs/subsidy_phaseout_sensitivity_scenario2_2050.RData")
+
+abm_subsidy <- bind_rows(
+                         readRDS("~/Policy/AgentBasedModels/Runs/subsidy_phaseout_2024.5_scenario2.RData"),
+                         )
+
+abm_subsidy <- readRDS("~/Policy/AgentBasedModels/Runs/subsidy_phaseout_sensitivity_scenario2_2050.RData")
+
+#2030 adoption
+test <- abm_subsidy %>% group_by(p_year,simulation,t,fuel) %>% filter(fuel=="EV") %>% summarise(n=n()/924)
+test <- inner_join(test,date_tab)
+g1 <- test %>% filter(date %in% c(date("2030-12-01"),date("2025-12-01"))) %>% ggplot(aes(factor(p_year),100*n,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g1 <- g1+labs(x="phaseout year",y="%",title="BEV uptake") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g1 <- g1+theme(legend.title = element_blank())
+#saveRDS(g1,"~/Policy/AgentBasedModels/Runs/uptakevsVKT.RData")
+g1
+
+abm.e <- abm_subsidy %>% group_by(p_year,t,simulation) %>% dplyr::summarise(e=mean(emissions) , tCO2=sum(emissions*mileage_vals[qev34])/12/1e+6)
+abm.e <- distinct(abm.e)
+abm.e <- inner_join(abm.e,date_tab)
+abm.e <- abm.e %>% group_by(p_year,simulation) %>% arrange(date) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+
+#co2 emissions in 2030
+g2 <- abm.e %>% filter(date %in% c(date("2030-12-01"),date("2025-12-01"))) %>% ggplot(aes(factor(p_year),cumulative_tCO2*2.1/924,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g2 <- g2 + labs(x="phaseout year",y="MtCO2",title="Cumulative Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g2 <- g2 +theme(legend.title = element_blank())
+g2
+
+abm.s <- abm_subsidy %>% filter(transaction) %>% group_by(p_year,t,simulation) %>% dplyr::summarise(cost=sum(price_exg-price))
+abm.s <- distinct(abm.s)
+abm.s <- inner_join(abm.s,date_tab)
+abm.s <- abm.s %>% mutate(s=replace(cost,is.na(cost),0))
+abm.s <- abm.s %>% group_by(p_year,simulation) %>% arrange(date) %>% mutate(cost=cumsum(s))
+abm.s <- inner_join(abm.e,abm.s)
+abm.s <- abm.s %>% group_by(simulation,date) %>% mutate(costpertCO2 = -(cost-first(cost))/(cumulative_tCO2-first(cumulative_tCO2)))
+
+#cumumative subsidy costs in 2030
+g3 <- abm.s %>% filter(date %in% date("2025-12-01") ) %>% ggplot(aes(factor(p_year),cost*2.1e+6/924/1e+6,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g3 <- g3 + labs(x="phaseout year",y="M???",title="Subsidy Cost") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g3 <- g3 +theme(legend.title = element_blank())
+g3
+
+g4 <- abm.s %>% filter(date == date("2030-12-01")) %>% ggplot(aes(factor(p_year),costpertCO2,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g4 <- g4 + labs(x="Subsidy phaseout year",y="Bne",title="Cumulative Direct Subsidy Cost 2015-2030") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g4 <- g4 +theme(legend.title = element_blank())
+g4
+
+g1+g2+g3
+#ggsave("~/Policy/AgentBasedModels/Runs/subsidies.png")
+
+g3 <- abm.s %>% filter(date %in% date("2030-12-01") ) %>% ggplot(aes(factor(p_year),costtCO2,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g3 <- g3 + labs(x="Subsidy phaseout year",y="Bne",title="Cumulative Direct Subsidy Cost 2015-2030") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g3 <- g3 +theme(legend.title = element_blank())
+g3
+
+
+#emissions avoided - compare actual emissions with zero EV 
+options(pillar.sigfig = 5)
+abm.s.summary <- abm.s %>% group_by(p_year,date) %>% summarise(e=median(e),cost=median(cost)*2.1/924,tCO2=median(cumulative_tCO2)*2.1/924,europerton=median(costpertCO2,na.rm=T), iqr=IQR(costpertCO2,na.rm=T)/1.349)
+
+abm.s.summary %>% filter(date %in% c(date("2030-12-01"),date("2040-12-01")))
+
+
+#########################################
+# Range anxiety dissapearance sensitivity
+#########################################
+scenario_2 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=2)
+
+scen <- scenario_2
+i <- 0
+a_years <- seq(2021,2030,by=2)
+abm_anxiety <- vector("list",length(a_years))
+
+for(a_year in a_years){
+  print(a_year)
+  scen_a <- scen %>% mutate(value=replace(value, parameter=="zero_range_anxiety_year",a_year))
+  abm <- runABM(scen_a,25,simulation_end = 2040)[[1]]
+  abm$a_year <- a_year
+  abm <- abm %>% select(ID,a_year,simulation,t,fuel,qev32,qev34,emissions,transaction,price,price_exg)
+  i <- i+1
+  abm_anxiety[[i]] <- abm
+  
+}
+abm_anxiety <- data.table::rbindlist(abm_anxiety)
+abm_anxiety <- as_tibble(abm_anxiety)
+saveRDS(abm_anxiety,"~/Policy/AgentBasedModels/Runs/zeroanxietyyear_sensitivity_25.RData")
+#2030 adoption
+test <- abm_anxiety %>% group_by(a_year,simulation,t,fuel) %>% filter(fuel=="EV") %>% summarise(n=n()/924)
+test <- inner_join(test,date_tab)
+g1 <- test %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(a_year),100*n,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g1 <- g1+labs(x="year",y="%",title="BEV uptake") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g1 <- g1+theme(legend.title = element_blank())
+#saveRDS(g1,"~/Policy/AgentBasedModels/Runs/uptakevsVKT.RData")
+g1
+
+abm.e <- abm_anxiety %>% group_by(a_year,t,simulation) %>% dplyr::summarise(e=mean(emissions) , tCO2=sum(emissions*mileage_vals[qev34])/12/1e+6)
+abm.e <- distinct(abm.e)
+abm.e <- inner_join(abm.e,date_tab)
+abm.e <- abm.e %>% group_by(a_year,simulation) %>% arrange(date) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+
+test <- abm.e %>% group_by(banyear,date) %>% summarise(banyear, e_mean=mean(e), cumulative_tCO2_mean=mean(cumulative_tCO2)) 
+test <- distinct(test)
+test %>% filter(date=="2030-12-01") %>% ggplot(aes(date,cumulative_tCO2_mean)) + geom_line()
+#co2 emissions in 2030
+g2 <- abm.e %>% filter(date %in% c(date("2030-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(a_year),cumulative_tCO2*2.1/924,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g2 <- g2 + labs(x="year",y="MtCO2",title="Cumulative Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g2 <- g2 +theme(legend.title = element_blank())
+g2
+
+g1+g2
+#ggsave("~/Policy/AgentBasedModels/Runs/range_anxiety.png")
+
+
+#########################################
+# battery pack cost sensitivity
+#########################################
+scenario_3 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=4)
+
+scen <- scenario_3
+i <- 0
+a_years <- seq(2024,2034,by=2)
+abm_battery <- vector("list",length(a_years))
+
+for(a_year in a_years){
+  print(a_year)
+  scen_a <- scen %>% mutate(value=replace(value, parameter=="year_100",a_year))
+  abm <- runABM(scen_a,20,simulation_end = 2040)[[1]]
+  abm$a_year <- a_year
+  abm <- abm %>% select(ID,a_year,simulation,t,fuel,qev32,qev34,emissions,transaction,price,price_exg)
+  i <- i+1
+  abm_battery[[i]] <- abm
+  rm(abm)
+  gc()
+}
+abm_battery <- data.table::rbindlist(abm_battery)
+abm_battery <- as_tibble(abm_battery)
+#saveRDS(abm_battery,"~/Policy/AgentBasedModels/Runs/battery_year100_sensitivity_20.RData")
+#2030 adoption
+test <- abm_battery %>% group_by(a_year,simulation,t,fuel) %>% filter(fuel=="EV") %>% summarise(n=n()/924)
+test <- inner_join(test,date_tab)
+g1 <- test %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(a_year),100*n,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g1 <- g1+labs(x="year 100???/kWh",y="%",title="BEV uptake") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g1 <- g1+theme(legend.title = element_blank())
+#saveRDS(g1,"~/Policy/AgentBasedModels/Runs/uptakevsVKT.RData")
+g1
+
+abm.e <- abm_battery %>% group_by(a_year,t,simulation) %>% dplyr::summarise(e=mean(emissions) , tCO2=sum(emissions*mileage_vals[qev34])/12/1e+6)
+abm.e <- distinct(abm.e)
+abm.e <- inner_join(abm.e,date_tab)
+abm.e <- abm.e %>% group_by(a_year,simulation) %>% arrange(date) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+
+#co2 emissions in 2030
+g2 <- abm.e %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"), date("2040-12-01"))) %>% ggplot(aes(factor(a_year),cumulative_tCO2*2.1/924,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g2 <- g2 + labs(x="year 100???/kWh",y="MtCO2",title="Cumulative Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g2 <- g2 +theme(legend.title = element_blank())
+g2
+
+g1+g2
+#ggsave("~/Policy/AgentBasedModels/Runs/battery_cost_scenario_3.png")
+
+
+########################################
+# sensitivity to ICEV fleet technology assumptions
+#######################################
+
+scenario_2 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=3)
+
+scen <- scenario_1
+i <- 0
+a_techs <- seq(120,180,by=10)
+abm_icev <- vector("list",length(a_techs))
+
+for(a_tech in a_techs){
+  print(a_tech)
+  scen_a <- scen %>% mutate(value=replace(value, parameter=="e_mean_final",a_tech))
+  abm <- runABM(scen_a,20,simulation_end = 2040)[[1]]
+  abm$a_tech <- a_tech
+  abm <- abm %>% select(ID,a_tech,simulation,t,fuel,qev32,qev34,emissions,transaction,price,price_exg)
+  i <- i+1
+  abm_icev[[i]] <- abm
+  rm(abm)
+  gc()
+}
+abm_icev <- data.table::rbindlist(abm_icev)
+abm_icev <- as_tibble(abm_icev)
+saveRDS(abm_icev,"~/Policy/AgentBasedModels/Runs/icevtech_sensitivity_20.RData")
+#2030 adoption
+test <- abm_icev %>% group_by(a_tech,simulation,t,fuel) %>% filter(fuel=="EV") %>% summarise(n=n()/924)
+test <- inner_join(test,date_tab)
+g1 <- test %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"),date("2040-12-01"))) %>% ggplot(aes(factor(a_tech),100*n,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g1 <- g1+labs(x="gCO2/km",y="%",title="BEV uptake") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g1 <- g1+theme(legend.title = element_blank())
+
+g1
+
+abm.e <- abm_icev %>% group_by(a_tech,t,simulation) %>% dplyr::summarise(e=mean(emissions) , tCO2=sum(emissions*mileage_vals[qev34])/12/1e+6)
+abm.e <- distinct(abm.e)
+abm.e <- inner_join(abm.e,date_tab)
+abm.e <- abm.e %>% group_by(a_tech,simulation) %>% arrange(date) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+
+
+abm.icev <- abm_icev %>% filter(fuel=="fossil") %>% group_by(a_tech,t,simulation) %>% dplyr::summarise(a_tech=a_tech,e=mean(emissions) , tCO2=sum(emissions*mileage_vals[qev34])/12/1e+6)
+abm.icev <- distinct(abm.icev)
+abm.icev <- inner_join(abm.icev,date_tab)
+abm.icev <- abm.icev %>% group_by(a_tech,simulation) %>% arrange(date) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+
+
+#co2 emissions in 2030
+g2 <- abm.e %>% filter(date %in% c(date("2030-12-01"),date("2035-12-01"), date("2040-12-01"))) %>% ggplot(aes(factor(a_tech),cumulative_tCO2*2.1/924,fill=factor(format_ISO8601(date,precision="ym")))) + geom_boxplot(position="identity") + theme_tufte()
+g2 <- g2 + labs(x="gCO2/km",y="MtCO2",title="Cumulative emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g2 <- g2 +theme(legend.title = element_blank())
+g2
+
+#co2 emissions in 2030
+g3 <- abm.icev %>% filter(date %in% c(date("2030-12-01"), date("2040-12-01"))) %>% ggplot(aes(e,cumulative_tCO2*2.1/924,colour=factor(format_ISO8601(date,precision="ym")))) + geom_point() + theme_tufte()
+g3 <- g3 + labs(x="year 100???/kWh",y="MtCO2",title="Cumulative Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g3 <- g3 +theme(legend.title = element_blank()) + geom_smooth()
+g3
+
+
+g4 <- abm.icev %>% filter(date %in% c(date("2030-12-01"),date("2040-12-01"))) %>% ggplot(aes(e,cumulative_tCO2,colour=factor(date))) + geom_point() + theme_tufte()
+g4 <- g4 + labs(x="average emissions gCO2/km",y="MtCO2",title="Cumulative Emissions") + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16))
+g4 <- g4 +theme(legend.title = element_blank())
+g4
+
+abm.icev.summary <- abm.icev %>% group_by(a_tech,date) %>% summarise(e=mean(e))
+
+g1+g2
+#ggsave("~/Policy/AgentBasedModels/Runs/icev_tech_scenario_1.png")
+
+#####################################
+# adoption behaviour
+######################################
+
+abm <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_3_Nrun=100.RData")
+getEVAdoption1(abm) %>% group_by(date) %>%  filter(date=="2030-12-1") %>% summarise(mean=mean(predicted), sd = sd(predicted))
+
+Nrun <- 100
+abm1 <- abm[[1]] %>% group_by(simulation,ID) %>% mutate(fuel_priormonth= lag(fuel)) %>% select(t,simulation,ID,qev31,emissions,transaction,fuel,fuel_priormonth)
+#group by two factors
+rm(abm)
+test <- abm1 %>% filter(transaction) %>% group_by(t,simulation,fuel,fuel_priormonth) %>% summarise(n=n())
+
+test <- test %>% group_by(t,fuel,fuel_priormonth) %>% summarise(fuel=fuel,fuel_priormonth=fuel_priormonth,n=mean(n)) 
+test <- test %>% mutate(date=y_zero+months(t-1))
+#test <- test %>% mutate(fuel=replace(fuel,fuel=="EV","BEV"),fuel=replace(fuel_priormonth,fuel_priormonth=="EV","BEV"))
+
+g <- test %>% ggplot(aes(date,100*n/924,colour=interaction(factor(fuel),factor(fuel_priormonth)))) + geom_point(size=0.7,alpha=0.8)
+g <- g + theme_tufte()+theme(legend.title=element_blank()) 
+g <- g + scale_color_hue(labels = c(expression("BEV" %->% "BEV"), expression("BEV" %->% "ICEV"),expression("ICEV" %->% "BEV"),expression("ICEV" %->% "ICEV")))
+g <- g + scale_y_continuous(trans="sqrt", breaks=c(0.2,0.5,1,1.5))
+g <- g + labs(y="%",x="", title="Scenario 3" ) 
+g <- g + theme(title = element_text(size=16), axis.title=element_text(size=16), axis.text=element_text(size=16),legend.text=element_text(size=16),legend.text.align = 0)
+#g <- g+ theme(legend.position = "none")
+g3 <- g
+
+g2+g3
+#ggsave("~/Policy/AgentBasedModels/Runs/adoption_behaviour.png")
+
+
+#####################################
+# demographic etc influence on adoption
+####################################
+
+abm <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_2_Nrun=100.RData")
+#average over runs
+#abm.id <- abm[[1]] %>% group_by(ID,t,fuel) %>% dplyr::summarise(n=n()/100)
+#
+abm <- abm[[1]] %>% filter(simulation <= 50)
+
+abm <- inner_join(abm[,c("ID","simulation","t","fuel")],as_tibble(society))
+abm <- inner_join(abm,agents_init[,-11],by="ID")
+abm$connection <- ifelse(degree(social) == 0,F,T)
+test <- filter(qanda, code=="qev32"); test <- test[,3:4]; names(test) <- c("qev32","budget")
+abm <- inner_join(abm, test)
+test <- filter(qanda, code=="qev34"); test <- test[,3:4]; names(test) <- c("qev34","mileage")
+abm <- inner_join(abm, test)
+test <- filter(qanda, code=="qev31"); test <- test[,3:4]; names(test) <- c("qev31","neworused")
+abm <- inner_join(abm, test)
+test <- filter(qanda, code=="q17a_2"); test <- test[,3:4]; names(test) <- c("q17a_2","environment")
+abm <- inner_join(abm, test)
+
+abm <- abm %>% mutate(connected = ifelse(degree > 0, TRUE, FALSE))
+varname1 <- "budget"
+varname2 <- NULL
+abm.ev <- abm %>% group_by_at(.vars=c("simulation",varname1,varname2,"t")) %>% dplyr::summarise(nev =sum(fuel=="EV"),nfossil=sum(fuel=="fossil")) %>% mutate(evfraction=nev/(nev+nfossil)) %>% group_by_at(.vars=c(varname1,varname2,"t")) %>% dplyr::summarise(evfraction=mean(evfraction))
+abm.ev$date <- y_zero+months(abm.ev$t-1)
+if( !is.null(varname1) & !is.null(varname2)) g <- abm.ev %>% ggplot(aes(date,100*evfraction,colour=interaction(factor(get(varname1)),factor(get(varname2))))) + geom_line(size=1) 
+if( is.null(varname1) & !is.null(varname2)) g <- abm.ev %>% ggplot(aes(date,100*evfraction,colour=factor(get(varname2)))) + geom_line(size=1) 
+if( !is.null(varname1) & is.null(varname2)) g <- abm.ev %>% ggplot(aes(date,100*evfraction,colour=factor(get(varname1)))) + geom_line(size=1) 
+g <- g + theme_tufte()#scale_y_continuous(trans="sqrt")
+g <- g + labs(title="kilometerage and EV adoption",x="",y="%") + scale_y_continuous(breaks=seq(0,100,by=10), trans="sqrt")
+g + geom_vline(xintercept = ymd("2030-12-01"),linetype="dotted") + scale_colour_discrete(name="kilometerage") + theme(legend.text = element_text(size=8)) + guides(colour=guide_legend(ncol=2))
+
+res <- abm.ev %>% filter(date == date("2030-12-01")) %>% arrange(evfraction)
+res <- res %>% select(varname1,varname2,"evfraction")
+res <- res %>% mutate(uptake=100*evfraction) %>% select(-"evfraction")
+
+res <- res %>% filter(education %in% c("Secondary","Third level degree","Master's degree","Doctorate"))
+write_csv(res,"~/Policy/AgentBasedModels/Runs/budget_2030_scenario2.csv")
+
+#boxplots - budget mileage 
+
+b1 <- filter(abm,t %in% c(192,192+5*12,192+10*12)) %>% group_by(simulation,qev34, date=y_zero + months(t-1)) %>% dplyr::summarise(nev =sum(fuel=="EV"),nfossil=sum(fuel=="fossil")) %>% mutate(evfraction=nev/(nev+nfossil))
+
+g <- b1 %>% ggplot(aes(factor(mileage_vals[qev34]),evfraction,fill=factor(date))) + geom_boxplot(position="identity") 
+g + theme_tufte()
+
+
+
+
+#technology plots
+emissions_model1 <- function (mileage, mean_emissions=190, sd_emissions=30, e_cut=80,zeta=0.75) {
+  #return(wltp_nedc_ratio * max(e_cut, ((e_upper + (e_lower - e_upper) * exp(-mileage/10000) + 25 * rnorm(1)))))
+  m_emissions <- mean_emissions + zeta*sd_emissions*tanh((mileage-10000)/20000)
+  shape_param <- ((m_emissions-e_cut)/sd_emissions)^2
+  theta <- (m_emissions-e_cut)/shape_param
+  return(rgamma(1,scale=theta,shape=shape_param)+e_cut)
+  
+}
+Nsamp <- 10000
+tech <- tibble(ID=6*Nsamp,mileage=60000,mean_emissions=as.vector(sapply(seq(120,190,by=10), function(e) replicate(Nsamp,e))),sd_emissions=30,e_cut = 50)
+tech <- tech %>% rowwise() %>% mutate(emissions =replicate(n(),emissions_model1(mileage=mileage,mean_emissions=mean_emissions,sd_emissions=sd_emissions, e_cut)))
+
+tech %>% ggplot() + geom_histogram(aes(emissions,fill=factor(mean_emissions)),alpha=0.2) + facet_wrap(factor(mean_emissions)~.)
+
+tech %>% group_by(mean_emissions) %>% summarise(mean=mean(emissions))
+
+
+
+
+#ICEV fleet
+abm.icev <- abm[[1]] %>% filter(simulation <= 50) %>% filter(fuel=="fossil") %>% group_by(yeartime=2015+(t-1)/12,ID) %>% dplyr::summarise(e=mean(emissions), tCO2=mean(emissions*mileage_vals[qev34])/12/1e+6) %>% group_by(date) %>% dplyr::summarise(e=mean(e),tCO2=mean(tCO2))
+test <- abm.e %>% group_by(vkt) %>% mutate(tCO2.cumulative=cumsum(tCO2))
+
+
+t30 <- getEVAdoption1(abm_vkt30) %>% group_by(date) %>%  filter(date=="2030-12-1") %>% summarise(mean=mean(predicted), sd = sd(predicted))
+vkt <- bind_rows(t0,t05,t10,t20,t30)
+vkt$reduction <- c(0,05,10,20,30)
+ggplot(vkt,aes(reduction,mean)) + geom_point() + geom_errorbar(aes(ymin=mean-sd,ymax=mean+sd)) + theme_tufte()
+
+
+mileage_vals <- c(3000,7500,15000,25000,35000,45000,60000)
+budget_vals <- 1000*c(7,13,18,23,28,33,38,45,55,60)
+
+
+summariseABM <- function(abm, year){
+  
+  Nrun <- filter(abm$system,parameter=="Nrun")$value
+  #create a high level summary of abm in terms of adoption and emissions for a given year
+  
+  #adoption and reverse adoption
+  abm1 <- abm[[1]] %>% group_by(simulation,ID) %>% mutate(fuel_priormonth= lag(fuel))
+  adopt <- filter(abm1, fuel_priormonth=="EV", fuel=="fossil", transaction) %>% group_by(t) %>% dplyr::summarise(n_reverse=n()/Nrun)
+  reverse <- filter(abm1, fuel_priormonth=="fossil", fuel=="EV", transaction) %>% group_by(t)  %>% dplyr::summarise(n_adopt=n()/Nrun)
+  adopt <- adopt %>% inner_join(reverse) %>% pivot_longer(-t)
+  # %>% ggplot(aes(t,nr_reverse)) + geom_point()
+  y_zero <- lubridate::ymd(paste(year_zero,1,1))
+  adopt <- adopt %>% mutate( date=y_zero+months(t-1))
+
+  #emissions
+  #assuming no VKT policy
+  abm.e <- abm[[1]] %>% filter(simulation <= 50) %>% group_by(date=y_zero+months(t-1),ID) %>% dplyr::summarise(e=mean(emissions), tCO2=mean(emissions*mileage_vals[qev34])/12/1e+6) %>% group_by(date) %>% dplyr::summarise(e=mean(e),tCO2=mean(tCO2))
+  #ICEV fleet
+  abm.e <- abm[[1]] %>% filter(simulation <= 50) %>% group_by(date=y_zero+months(t-1),ID) %>% dplyr::summarise(e=mean(emissions), tCO2=sum(emissions*mileage_vals[qev34])/12/1e+6) 
+  abm.icev <- abm[[1]] %>% filter(simulation <= 50) %>% filter(fuel=="fossil") %>% group_by(date=y_zero+months(t-1),ID) %>% dplyr::summarise(e=mean(emissions), tCO2=mean(emissions*mileage_vals[qev34])/12/1e+6) %>% group_by(date) %>% dplyr::summarise(e=mean(e),tCO2=mean(tCO2))
+  abm.e$tCO2_cumulative <- cumsum(abm.e$tCO2)*2.1/924
+  
+  #prices paid averaged over IDs and runs
+  abm.p <- abm[[1]] %>% filter(transaction) %>% group_by(fuel,date=y_zero+months(t-1)) %>% dplyr::summarise(p2=mean(price), subsidy=mean(price_exg-price))
+  
+  return(c(sum(adopt1$cost), filter(abm.e,yeartime==year)))
+}
+
+
+adopt %>% ggplot(aes(date,value*2.1e+3/924,colour=name)) + geom_point() + theme_economist()
+
+adopt1 <- adopt %>% pivot_wider() %>% rowwise() %>% dplyr::mutate(cost=grant_fun(yeartime), cost=grant*n_adopt/2.1/924)
+
+#abm.e <- abm[[1]] %>% group_by(t,ID) %>% dplyr::summarise(tCO2=mean(emissions*mileage_vals[qev34])/12/1e+6) %>% group_by(yeartime=year_zero+(t-1)/12) %>% dplyr::summarise(tCO2=mean(tCO2))
+#sum over 2.1 fleet
+abm.e$cumulative <- cumsum(abm.e$tCO2)
+
+abm.e 
+
+
+##########################
+# demographics of adopters
+##########################
+
+abm <- readRDS("~/Policy/AgentBasedModels/Runs/scenario_2_Nrun=100.RData")
+
+graph_adoption_category <- function(abm,varname){
+ 
+  if(!(varname %in% names(society))) stop("invalid varname")
+  meanadopt <- getEVAdoption1(abm) %>% group_by(date) %>%  filter(date=="2030-12-1") %>% summarise(mean=mean(predicted), sd = sd(predicted))
+  
+  #abm.id <- abm[[1]] %>% group_by(ID,t,fuel) %>% dplyr::summarise(n=n()/100)
+  abm.id <- inner_join(abm[[1]][,c("ID","simulation","t","fuel")],society)
+  abm.id <- abm.id %>% group_by_at(.vars=c("simulation",varname,"t")) %>% dplyr::summarise(nev =sum(fuel=="EV"),nfossil=sum(fuel=="fossil")) %>% mutate(evfraction=nev/(nev+nfossil))
+  #abm.id <- abm.id %>% group_by_at(.vars=c(varname,"t")) %>% dplyr::summarise(evfraction=mean(evfraction))
+  abm.id$date <- y_zero+months(abm.id$t-1)
+  g <- abm.id %>% filter(simulation %in% 1:100) %>% ggplot() 
+  g <- g + geom_line(aes(date,100*evfraction,group=interaction(simulation,get(varname)),colour=factor(get(varname))),size=0.1,alpha=0.2) + theme_tufte() 
+  g <- g + geom_hline(yintercept=100*meanadopt$mean,linetype="dotted")#scale_y_continuous(trans="sqrt")
+  g <- g + labs(title=paste("BEV uptake by", varname),x="",y="%")
+  g <- g + geom_vline(xintercept = ymd("2030-12-01"),linetype="dotted") 
+  g <- g+ scale_colour_discrete(name="") +facet_wrap(region~.)
+  g + theme(legend.text = element_text(size=8))# + guides(colour=guide_legend(ncol=2))
+  
+}
+
+
+graph_adoption_category(abm,"region")
+
+
+abm.id <- abm[[1]] %>% group_by(ID,t,fuel) %>% dplyr::summarise(n=n()/100)
+abm.id <- inner_join(abm[[1]][,c("ID","simulation","t","fuel")],society)
+abm.id <- inner_join(abm.id,agents_in[,-11],by="ID")
+abm.id$connection <- ifelse(degree(social) == 0,F,T)
+test <- filter(qanda, code=="qev32"); test <- test[,3:4]; names(test) <- c("qev32","budget")
+abm.id <- inner_join(abm.id, test)
+test <- filter(qanda, code=="qev34"); test <- test[,3:4]; names(test) <- c("qev34","mileage")
+abm.id <- inner_join(abm.id, test)
+test <- filter(qanda, code=="qev31"); test <- test[,3:4]; names(test) <- c("qev31","neworused")
+abm.id <- inner_join(abm.id, test)
+
+varname <- "class"
+abm.ev <- abm.id %>% group_by_at(.vars=c("simulation",varname,"t")) %>% dplyr::summarise(nev =sum(fuel=="EV"),nfossil=sum(fuel=="fossil")) %>% mutate(evfraction=nev/(nev+nfossil)) %>% group_by_at(.vars=c(varname,"t")) %>% dplyr::summarise(evfraction=mean(evfraction))
+abm.ev$date <- y_zero+months(abm.ev$t-1)
+g <- abm.ev %>% ggplot(aes(date,100*evfraction,colour=factor(get(varname)))) + geom_line(size=1) + theme_economist() + geom_hline(yintercept=41,linetype="dotted")#scale_y_continuous(trans="sqrt")
+g <- g + labs(title="kilometerage and EV adoption",x="",y="%",subtitle=TeX('2024 price parity, 2018 price premium = +25%, $\\lambda$ = 0.105, $\\gamma$=0.4, runs =200')) + scale_y_continuous(breaks=seq(0,100,by=10))
+g + geom_vline(xintercept = ymd("2030-12-01"),linetype="dotted") + scale_colour_discrete(name="kilometerage") + theme(legend.text = element_text(size=8)) + guides(colour=guide_legend(ncol=2))
+#ggsave("~/Policy/AgentBasedModels/mileage_influence_on_adoption.png")
+
+
+
+
+
+
+g_1 <- graph_adoption(abm_1)
+g_vkt <- graph_adoption(abm_vkt)
+g_1/g_vkt
+
+
+nedc_to_wltp <- function(nedc,fuel="Diesel"){
+  #from revenue
+  if(fuel=="Petrol") return(nedc*0.9227+34.554)
+  if(fuel=="Diesel") return(nedc*1.1405+12.858)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#calibration runs
+#load("C:/Users/Joe/pkgs/evmicrosimr/R/sysdata.rda")
+#
+
+scenario_1 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=2)
+
+abm <- runABM(scenario_1,50,simulation_end = 2020)
+
+getEVAdoption1 <- function(abm){
+  #returns the EV adoption rate across runs
+  adoption <- abm[[1]] %>% dplyr::group_by(simulation,t,fuel) %>% dplyr::summarise(n=n())
+  Nrun <- length(unique(adoption$simulation))
+  Nt <- length(unique(adoption$t))
+  test <- expand.grid(1:Nrun,1:Nt,fuel=c("EV","fossil")) %>% tibble::as_tibble()
+  names(test) <- c("simulation","t","fuel")
+  test$fuel <- as.character(test$fuel)
+  adoption <- dplyr::left_join(test,adoption)
+  adoption <- adoption %>% dplyr::mutate(n=tidyr::replace_na(n,0))
+  y_zero <- lubridate::ymd(paste(year_zero,1,1))
+  adoption$date <- y_zero+months(adoption$t-1)
+  
+  #adoption <- adoption %>% group_by(simulation,fuel) %>% mutate(dn=n-lag(n))
+  adoption <- adoption %>% dplyr::filter(fuel=="EV") %>% dplyr::mutate(predicted=n/924)
+  
+  return(adoption[,c(1,5,6)])
+}
+
+graph_adoption <- function(abm, yscale="sqrt"){
+  #
+  adoption1 <- getEVAdoption1(abm)
+  Nrun <- length(unique(adoption1$simulation))
+  adoption2 <- adoption1 %>% dplyr::group_by(date) %>% dplyr::summarise(predicted=mean(predicted))
+  
+  g <- adoption1 %>% dplyr::filter(year(date) <= 2050, year(date) >= year_zero ) %>% ggplot2::ggplot()
+  g <- g + ggplot2::geom_line(aes(date,predicted*2.2e+3,colour=factor(simulation)),size=0.1,alpha=0.4)
+  if(yscale=="sqrt") g <- g + ggplot2::scale_y_continuous(limits=c(0,2.2e+3), trans="sqrt",breaks=c(10,100,400,1000,2000))
+  if(yscale=="linear") g
+  g <- g + ggthemes::theme_tufte()
+  g <- g + ggplot2::labs(x="", y="Thousands of EVs",title="EV number", subtitle=latex2exp::TeX(paste('$\\lambda$ =',lambda.,'$\\beta$ =',beta., 'runs =',Nrun, '2020 battery cost=', round(battery_cost_function(scenario_1,2020.5)),'euros/kWh ev premium=', round(ev_premium_fun(scenario_1,2020.5)),"euros")))
+  g <- g + ggplot2::geom_hline(yintercept = dplyr::filter(adoption2, date=="2030-12-01")$predicted*2.2e+3,linetype="dotted")
+  g <- g + ggplot2::geom_vline(xintercept = lubridate::ymd("20301201"),linetype="dotted")
+  g <- g + ggplot2::theme(legend.position = "None")
+  g <- g + ggplot2::geom_point(data=bev_historical_uptake %>% dplyr::filter(year(date) >= 2010),aes(date,2.2e+1*penetration),shape=4,size=2,colour="grey40")
+  g <- g + ggplot2::geom_line(data=adoption2, aes(date,predicted*2.2e+3), colour="grey50")
+  g
+}
+
+graph_adoption(abm,yscale="linear")
+
+scenario_fulldata <- function(sD){
+  
+  Nt <- (end_year-year_zero+1)*12
+  y_zero <- lubridate::ymd(paste(year_zero,1,1))
+  scen <- list("vector",Nt)
+  for(t in 1:Nt){
+    df <- scenario_params_df(sD,yeartime = year_zero+(t-1)/12)
+    df$date <- y_zero+months(t-1)
+    scen[[t]] <- df
+  }
+  scen <- tibble::as_tibble(data.table::rbindlist(scen))
+  return(scen)
+  
+}
+
+scen <- scenario_fulldata(scenario_1)
+
+scen %>% ggplot(aes(date,value)) + geom_line() + facet_wrap(parameter~., scales="free_y")
+
+##########
+# compare empirical budget and mileage utils with util_econ
+
+
+survey_raw <- read_csv("~/Policy/AgentBasedModels/Survey/ESB Final data +LCA.csv")
+survey_raw <- survey_raw %>% mutate_each(funs(as.integer))
+
+qanda <- read_csv("~/Policy/AgentBasedModels/Survey/QandA.csv" )
+qanda$code <- tolower(qanda$code)
+questions <- distinct(qanda[,c(1,2,5)])
+#
+survey_ev <- survey_raw %>% dplyr::select(tolower(qanda$code))
+
+createTable <- function(q1,q2){
+  #
+  ev <- ev_owners %>% group_by(q1=get(q1),q2=get(q2)) %>% summarise(n=n()) %>% inner_join(filter(qanda,code==q1)[,3:4],by=c(q1="answercode")) %>% inner_join(filter(qanda,code==q2)[,3:4],by=c(q2="answercode"))
+  names(ev)[1:2] <- c(q1,q2)
+  names(ev)[4:5] <- toupper(c(q1,q2))
+  return(ev)
+}
+#questions that require numerical answer
+non_multiple_choice_question_codes <- c("q16","qe1b_1","qe1b_2","V1301_1","V1302_1","qev23")
+
+createTable2 <- function(survey = survey_ev, q){
+  #cross table for n variables
+  q1 <- q[!(q %in% non_multiple_choice_question_codes)]
+  q2 <- q[(q %in% non_multiple_choice_question_codes)]
+  n <- length(q)
+  ev <- survey %>% group_by_at(vars(one_of(q))) %>% summarise(n=n()) 
+  for(qq in q1)
+    ev <- ev %>% inner_join(filter(qanda,code==qq)[,3:4],by=setNames("answercode",qq))# %>% inner_join(filter(qanda,code==q2)[,3:4],by=c(q2="answercode"))
+  for(qq in q2)
+    ev$qq <- "number"# %>% inner_join(filter(qanda,code==q2)[,3:4],by=c(q2="answercode"))
+  names(ev)[1:n] <- q
+  names(ev)[seq(n+2,2*n+1)] <- toupper(q)
+  return(ev)
+}
+
+scenario_3 <- readxl::read_xlsx("~/Policy/AgentBasedModels/scenarioDesign.xlsx",sheet=4)
+#scenario_1 <- scenario_1 %>% mutate(value=replace(value, parameter=="range_anxiety_yearzero",0.021))
+
+df <- expand.grid(budget=budget_vals,mileage=mileage_vals, year=c(2015:2022,seq(2024,2030,by=2))) %>% as_tibble()
+df <- df %>% rowwise() %>% mutate(emissions = mean(replicate(1000,emissions_model1(mileage,mean_emissions = 190, e_cut=80,zeta=0.7))))
+df <- df %>% rowwise() %>% dplyr::mutate(du_econ = util_tco(budget,mileage,emissions, scenario_params(scenario_1,year+0.5),flag="old"))
+
+df %>% filter(year==2015) %>% group_by(mileage) %>% summarise(e=mean(emissions),du= mean(du_econ))
+
+g1 <- ggplot(df %>% filter(), aes(budget,du_econ,colour=factor(mileage))) + geom_line() + facet_grid(.~year) + theme_economist() + theme(axis.text.x=element_text(size=10,angle=90))
+g1 <- g1 + scale_x_continuous(breaks=c(20000,40000,60000), labels=c("20k","40k","60k")) + scale_color_brewer(name="km",palette = )
+g2 <- ggplot(df, aes(mileage,du_econ,colour=factor(budget))) + geom_line() + facet_grid(.~year) + theme_economist()  + theme(axis.text.x=element_text(size=10,angle=90))
+g2 <- g2 + scale_x_continuous(breaks=c(10000,30000,50000), labels=c("10k","30k","50k")) + scale_color_brewer(name="???")
+g2/g1
+
+ev_data <- read_csv("~/Policy/AgentBasedModels/modeldata_allcarbuyers.csv")
+util_empirical <- read_csv("~/Policy/AgentBasedModels/empirical_utilities.csv")
+t1 <- ev_data %>% createTable2("qev34")
+t1$mileage <- mileage_vals[t1$qev34]
+df1 <- inner_join(df,t1)
+
+
+gg1 <- df1 %>% group_by(budget,year) %>% dplyr::summarise(du_econ=weighted.mean(du_econ,n)) %>% filter(year %in% 2019:2021) %>% group_by(budget) %>% summarise(du_econ=mean(du_econ))
+gg1 <- gg1 %>% ggplot(aes(budget, du_econ+0.0525)) + geom_line()+ geom_point()+geom_point(data = tibble(budget=budget_vals, empirical=filter(util_empirical,name=="qev32")$shap),aes(budget,empirical),colour="grey50",size=4)
+gg1 <- gg1 + theme_tufte()
+t2 <- ev_data %>% createTable2("qev32")
+t2$budget <- budget_vals[t2$qev32]
+df2 <- inner_join(df,t2)
+
+gg2 <- df2 %>% group_by(mileage,year) %>% dplyr::summarise(du_econ=weighted.mean(du_econ,n)) %>% filter(year %in% 2019:2021) %>% group_by(mileage) %>% summarise(du_econ=mean(du_econ)) 
+gg2 <- gg2 %>% ggplot(aes(mileage, du_econ+0.055)) + geom_line()+geom_point() +geom_point(data = tibble(mileage=mileage_vals, empirical=filter(util_empirical,name=="qev34")$shap),aes(mileage,empirical),colour="grey50",size=4)
+gg2 <- gg2+ theme_tufte()
+gg1/gg2
+
+#ggsave("~/Policy/AgentBasedModels/budget_mileage_calibration.png")
+scenario_1 %>% filter(parameter=="range_anxiety_yearzero")
+
+df %>% ggplot(aes(mileage, du_econ,colour=factor(budget))) + geom_line()
+
+util_tco(20000, 17000, 150, params2020)

@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1612365647131.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2258984776",
+    "id" : "47B7F20E",
+    "lastKnownWriteTime" : 1612365939,
+    "last_content_update" : 1612365939411,
+    "path" : "C:/Users/Joe/pkgs/phevmicrosimr/R/fleet.R",
+    "project_path" : "R/fleet.R",
+    "properties" : {
+        "cursorPosition" : "10,32",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 10,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

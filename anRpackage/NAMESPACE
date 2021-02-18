@@ -1,0 +1,12 @@
+export("a_s", "abm", "ag", "agent_ts", "agents_in", "agents_in1", "agents_out", "assign_segments", "b_s", "b0", "b1",
+       "battery_cost_function", "bay", "bay1", "bays", "budger", "budget", "car_choice", "car_segments", "cars", "choice",
+       "choices", "choose_initial_car", "createTable2", "current_tech", "current_tech_costs", "deprec", "df", "dU_enviro",
+       "dU_social", "e_ice", "emissions", "emissions_phev", "ev_data", "ev_nodes", "excise_2020", "excise_2030",
+       "excise_2050", "f", "flag", "flag0", "fleet", "fleet_summary", "fleet_yeartime", "fleet1", "flipper", "fuel_type",
+       "fuelcosts", "g", "i", "incentive_fun", "incentives", "init", "init_fleet_cut", "init_fleet_mean", "initial_fleet",
+       "irish_fleet", "j", "list_price", "m", "ma", "mileage", "model_choice", "models", "n_unused_cores",
+       "non_multiple_choice_question_codes", "Nrun", "Nt", "number_of_cores", "othercosts", "p0", "p1", "p2", "p3", "p4",
+       "p5", "pair_type", "pairtype_1", "params", "qanda", "ra", "resample_society", "rrp_full", "rrp_incentive", "rrp0",
+       "scen", "scenario_1", "sD", "seg", "seg_prob", "segment_bayes_posteriors", "segments_bayes_posteriors", "segs",
+       "simulation_end", "social", "social_network", "social_netwrk", "t", "tech", "term", "test", "types", "types1", "u",
+       "u_financial", "update_cars", "utils_fun", "year", "years", "yeartime")

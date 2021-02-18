@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1610045016633.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2735876866",
+    "id" : "BABBB017",
+    "lastKnownWriteTime" : 1607595830,
+    "last_content_update" : 1607595830,
+    "path" : "~/Policy/AgentBasedModels/abm_paper.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "138,21",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 6,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

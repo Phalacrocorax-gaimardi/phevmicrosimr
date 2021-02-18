@@ -1,4 +1,9 @@
 # phevmicrosimr
+
+<!-- badges: start -->
+use_lifecycle_badge("stable")
+<!-- badges: end -->
+
 This is an agent-based microsimulator for ZEV uptake. 
 
 ## Installation

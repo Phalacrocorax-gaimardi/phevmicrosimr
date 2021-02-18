@@ -13,11 +13,7 @@ install_github("Phalacrocorax-gaimardi/phevmicrosimr")
 ```
 runABM(scenario=scenario_1,Nrun=8)
 ```
-See
-```
-help(runABM)
-```
-for more details
+Use `help(runABM)` for more details.
 
 ## Data
 

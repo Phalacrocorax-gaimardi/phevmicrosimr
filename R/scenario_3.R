@@ -1,6 +1,6 @@
-#' scenario_2
+#' scenario_3
 #'
-#' pump price increases to euro 1.90, favourable technology scenario, bev grant maintained until 2025
+#' pump price increases to euro 2.40, favourable technology scenario, bev grant maintained until 2025
 #'
 #' @format A data frame with 225 rows and 5 variables:
 #' \describe{
@@ -13,4 +13,4 @@
 #'   
 #' }
 #' @source \url{various}
-"scenario_2"
+"scenario_3"

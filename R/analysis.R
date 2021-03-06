@@ -11,7 +11,7 @@
 getEVAdoption1 <- function(abm){
   #returns the EV adoption rate across runs
   adoption <- abm[[1]] %>% dplyr::group_by(simulation,t,type) %>% dplyr::summarise(n=dplyr::n())
-  Nrun <- length(unique(adoption$simulation))
+  Nrun <- dplyr::filter(abm[[3]],parameter=="Nrun")$value
   Nt <- length(unique(adoption$t))
   test <- expand.grid(1:Nrun,1:Nt,type=c("diesel","petrol","hev","phev","bev")) %>% tibble::as_tibble()
   names(test) <- c("simulation","t","type")
@@ -279,6 +279,53 @@ getMileages <- function(abm){
   return(kms)
   
 }
+
+
+
+#' getZEVSales
+#' 
+#' annual ZEV sales market share by
+#'
+#' @param abm output of runABM
+#'
+#' @return sales dataframe (year, sales fraction)
+#' @export
+#'
+#' @examples
+getZEVSales <- function(abm){
+  #
+  df <- tidyr::expand_grid(qev31=c("new","used"),type=c("bev","phev"),year=2015:2050)
+  Nrun <- dplyr::filter(abm[[3]],parameter=="Nrun")$value
+  sales <- abm[[1]] %>% dplyr::filter(transaction) %>% dplyr::mutate(qev31 = ifelse(qev31==1,"new","used"))
+  sales0 <-  sales %>% dplyr::group_by(qev31,year=lubridate::year(y_zero+months(t-1))) %>% dplyr::summarise(total_sales=dplyr::n()/(Nrun))
+  sales <- sales %>% dplyr::group_by(type,qev31,year=lubridate::year(y_zero+months(t-1))) %>% dplyr::summarise(sales=dplyr::n()/(Nrun)) #annual sales by type & new/used
+  sales <- dplyr::inner_join(sales,sales0)
+  sales <- sales %>% dplyr::rowwise() %>% dplyr::mutate(share=sales/total_sales) %>% dplyr::filter(type %in% c("bev","phev")) %>% dplyr::select(qev31,type,year,share)
+  sales <- dplyr::left_join(df,sales) %>% dplyr::mutate(share=tidyr::replace_na(share,0))
+  return(sales)
+  
+}
+
+
+
+#' getActivity
+#' 
+#' annual activity (km) by powertrain type
+#'
+#' @param abm output of runABM
+#'
+#' @return dataframe type, year, activity
+#' @export
+#'
+#' @examples
+getActivity <- function(abm){
+
+ y_zero <- lubridate::ymd(paste(year_zero,1,1))
+ Nrun <- dplyr::filter(abm[[3]],parameter=="Nrun")$value
+ activity <- abm[[1]] %>% dplyr::group_by(type,year=lubridate::year(y_zero+months(t-1))) %>% dplyr::summarise(activity=sum(mileage_vals[qev34]/(12*20)))
+ return(activity) 
+}
+
 
 
 

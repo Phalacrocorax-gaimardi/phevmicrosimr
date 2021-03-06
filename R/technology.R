@@ -1,8 +1,11 @@
 #scenario_1 <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/scenarioDesignPHEV.xlsx",sheet=2)
 #scenario_2 <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/scenarioDesignPHEV.xlsx",sheet=3)
+#scenario_3 <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/scenarioDesignPHEV.xlsx",sheet=4)
+
+#use_data(scenario_3,overwrite=T)
 #use_data(scenario_2,overwrite=T)
 #use_data(scenario_1,overwrite=T)
-#fleet <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/survey_fleet.xlsx",sheet=6, range="A1:P342")
+#fleet <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/survey_fleet.xlsx",sheet=6, range="A1:P347")
 #bevs <- filter(fleet,type=="bev")
 #fleet <- fleet %>% filter(!is.na(`2021_rrp`))
 #fleet$kWh <- as.numeric(fleet$kWh)
@@ -512,10 +515,11 @@ depreciation_spread_fun <- function(type,sD,yeartime){
 
 #' initialise_segments
 #' 
-#' initialises agents vehicle segment choice based on naive bayes classifier
+#' extends agents_init with vehicle model & segment choice based on naive bayes classifier
 #' a car model is the assigned by on segment choice, observed Irish make preferences 2014-2019 & 2021, and 2021 new fleet dataframe
 #'
-#' @param sD scenario
+#'
+#' @param sD scenario (needed for historical fleet parameters)
 #'
 #' @return initial agents dataframe
 #' @export
@@ -536,10 +540,6 @@ initialise_segments <- function(sD){
     car_models <- dplyr::filter(fleet1,make==dplyr::slice_sample(init_car,n=1, weight_by = init_car$number)$make)
     #pick one if there are multiple options exist
     car_models <- car_models %>% dplyr::slice_sample(n=1)
-    #if only cars with wrong fuel type are available in fleet ...
-    #right_cars <- dplyr::filter(car_models, type==fuel)
-    #wrong_cars <- dplyr::filter(car_models, type!=fuel)
-    #ifelse(dim(right_cars)[1] > 0,  return(dplyr::slice_sample(right_cars,n=1)),return(dplyr::slice_sample(wrong_cars,n=1)))
     return(car_models)
   }
   
@@ -863,11 +863,11 @@ runABM <- function(sD, Nrun=1,simulation_end=end_year,resample_society=F,n_unuse
     #randomiise ICEV emissions assignment
     #choose segments
     agents_in <- initialise_segments(sD)
-    
-    #agents_in <- agents_init %>% dplyr::rowwise() %>% dplyr::mutate(emissions=phevmicrosimr::emissions_model1(mileage_vals[qev34],mean_emissions = init_fleet_mean,e_cut=init_fleet_cut))
+    #no transactions
     agents_in$transaction <- FALSE
-    #agents_in$price <- NA
-    #agents_in$price_exg <- NA  #price paid before subsidies
+    #fraction of drivers who are uncer
+    r_new <- dplyr::filter(sD,parameter=="r_new")$value
+    agents_in <- agents_in %>% dplyr::rowwise() %>% dplyr::mutate(qev31 = replace(qev31, qev31==3, sample(c(1,2),1,prob=c(r_new,1-r_new))))
     agents_in <- dplyr::ungroup(agents_in)
     agent_ts<- vector("list",Nt)
     agent_ts[[1]] <- agents_in #agent paraneters with regularized weights

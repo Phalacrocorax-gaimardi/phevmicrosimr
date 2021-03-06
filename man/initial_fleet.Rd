@@ -7,7 +7,7 @@
 \format{
 A data frame with 225 rows and 5 variables:
 \describe{
-  \item{rank}{ranl}
+  \item{rank}{rank}
   \item{make}{manufacturer}
   \item{model}{model}
   \item{number}{number purchased}

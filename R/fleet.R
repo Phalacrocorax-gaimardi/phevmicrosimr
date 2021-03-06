@@ -13,8 +13,8 @@
 #'   \item{make}{manufacturer}
 #'   \item{model}{model}
 #'   \item{segment}{car market segment A,B,C,D,E,F, crossovers (-J) and multi-purpose vehicles (-M). Sports cars are S.}
-#'   \item{type}{powertrain/fuel type}
-#'   \item{2021_rrp} {price excluding subsidies}
+#'   \item{type}{powertrain or fuel type}
+#'   \item{2021_rrp}{price excluding subsidies}
 #'   \item{tech_cost_2021}{retail price before incentives (including VAT and VRT)}
 #'   \item{WLTP}{combined WLTP emissions}
 #'   \item{vrt}{vrt rate for 2021 based on WLTP}
@@ -24,8 +24,8 @@
 #'   \item{comment}{additional info}
 #'   \item{kWh/100km}{conversion efficiency if quoted}
 #'   \item{AER}{quoted electric ranges}
-#'   \item{model_start}{model introduction time}
-#'   \item{model_end}{model termination time}
+#'   \item{model_start}{introduction model year}
+#'   \item{model_end}{last model year if applicable}
 #' }
 #' @source \url{Multiples sources primarilty manufacturer price lists. Also https://www.rte.ie/brainstorm/2020/1215/1184581-electric-cars-buyers-guide-2021-ireland/}
 "fleet"

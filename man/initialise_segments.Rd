@@ -7,12 +7,12 @@
 initialise_segments(sD)
 }
 \arguments{
-\item{sD}{scenario}
+\item{sD}{scenario (needed for historical fleet parameters)}
 }
 \value{
 initial agents dataframe
 }
 \description{
-initialises agents vehicle segment choice based on naive bayes classifier
+extends agents_init with vehicle model & segment choice based on naive bayes classifier
 a car model is the assigned by on segment choice, observed Irish make preferences 2014-2019 & 2021, and 2021 new fleet dataframe
 }

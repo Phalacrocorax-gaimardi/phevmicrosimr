@@ -59,44 +59,7 @@
 
       </header><div class="row">
   <div class="contents col-md-9">
-<div id="phevmicrosimr" class="section level1">
-<div class="page-header"><h1 class="hasAnchor">
-<a href="#phevmicrosimr" class="anchor"></a>phevmicrosimr</h1></div>
-<!-- badges: start -->
-<!-- badges: end -->
-<p>Agent-based microsimulator for ZEV transition.</p>
-<div id="installation" class="section level2">
-<h2 class="hasAnchor">
-<a href="#installation" class="anchor"></a>Installation</h2>
-<pre><code><a href="https://devtools.r-lib.org/">library(devtools)
-install_github("Phalacrocorax-gaimardi/microsim")
-install_github("Phalacrocorax-gaimardi/phevmicrosimr")</a></code></pre>
-</div>
-<div id="usage" class="section level2">
-<h2 class="hasAnchor">
-<a href="#usage" class="anchor"></a>Usage</h2>
-<pre><code><a href="reference/runABM.html">runABM(scenario=scenario_1,Nrun=8)</a></code></pre>
-</div>
-<div id="data" class="section level2">
-<h2 class="hasAnchor">
-<a href="#data" class="anchor"></a>Data</h2>
-<pre><code><a href="https://rdrr.io/r/utils/data.html">#fleet data
-data(fleet)
-#agent characteristics
-data(agents_init)
-#techno-economic scenario
-data(scenario_1)</a></code></pre>
-</div>
-<div id="dependencies" class="section level2">
-<h2 class="hasAnchor">
-<a href="#dependencies" class="anchor"></a>Dependencies</h2>
-<ul>
-<li><p>R Version 4.0.0 or later.</p></li>
-<li><p>Tested on Windows 10 and macOS Mojave.</p></li>
-<li><p>Social influence network builder <a href="https://github.com/Phalacrocorax-gaimardi/microsim">microsim</a></p></li>
-</ul>
-</div>
-</div>
+Agent-based micro-simulation of BEV-PHEV adoption based on detailed policy and technology scenarios.This packages contains functions to load a run a pre-calibrated model. Functions to handle policy scenarios are in policy.R. Functions to deal with market scenarios are in market.R. Functions to deal with BEV technology are in technology.R. Good luck!
   </div>
 
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">

@@ -162,18 +162,18 @@ fuel_price_fun <- function(type="diesel",crudeoilprice=50,crackspread = 10, marg
 fuel_price_fun1 <- function(type="diesel", sD, yeartime){
   
                crudeoilprice <- oil_price_fun(sD,yeartime)
-               crackspread <- crackspread_fun(type="diesel",sD,yeartime)
+               crackspread <- crackspread_fun(type=type,sD,yeartime)
                margin <- 0.12
                carbon_tax <- carbon_tax_fun(sD,yeartime)
-               excise_duty <- diesel_excise_duty_fun(sD,yeartime)
+               excise_duty <- 
                NORA <- 0.02 
                bio <-  0.014
                VAT <- 0.23
                
                if(type=="diesel")
-                 return(((crudeoilprice+crackspread)/159+margin + excise_duty + carbon_tax/1000*2.640 + NORA)*(1+VAT))
+                 return(((crudeoilprice+crackspread)/159+margin + diesel_excise_duty_fun(sD,yeartime) + carbon_tax/1000*2.640 + NORA)*(1+VAT))
                if(type=="gasoline")
-                 return(((crudeoilprice+crackspread)/159+margin + excise_duty + carbon_tax/1000*2.392 + NORA)*(1+VAT))
+                 return(((crudeoilprice+crackspread)/159+margin + gasoline_excise_duty_fun(sD,yeartime) + carbon_tax/1000*2.392 + NORA)*(1+VAT))
                
 
 }

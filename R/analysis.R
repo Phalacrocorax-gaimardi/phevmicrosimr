@@ -35,6 +35,7 @@ getEVAdoption1 <- function(abm){
 #' @param abm output of runABM
 #' @param addvars vector of additional variables  
 #' @param xi phev behavioural parameter xi=1 is optimal charging behaviour
+#' @param epsilon kilometer fuel price elasticity for ICEV drivers (typically -0.15)
 #' @param average_over_runs if FALSE return individual run emissions, otherwise average over runs
 #' @param emissions_start_date start date for cumulative emissions calculation
 #'
@@ -42,21 +43,39 @@ getEVAdoption1 <- function(abm){
 #' @export
 #'
 #' @examples
-getEmissions <- function(abm, addvars=NULL, xi=1,average_over_runs=F,emissions_start_date=NULL){
+getEmissions <- function(abm, addvars=NULL, xi=1,epsilon = 0, average_over_runs=F,emissions_start_date=NULL){
   #returns the EV adoption rate across runs
+  
+  mileage_elastic <- function(epsilon,qev34,price){
+    
+    return(mileage_vals[qev34]*(price/1.40)^epsilon)
+    
+  }
+  
   year_zero <- 2015
   y_zero <- lubridate::ymd(paste(year_zero,1,1))
   end_year <-  filter(abm[["system"]],parameter=="end_year")$value
   Nt <- (end_year+1-year_zero)*12
   date_tab <- tibble(t=1:Nt)
   date_tab <- date_tab %>% mutate(date=y_zero+months(t-1))
+  date_tab <- date_tab %>% mutate(diesel=fuel_price_fun1("diesel",abm[[2]],decimal_date(date)),gasoline=fuel_price_fun1("gasoline",abm[[2]],decimal_date(date)))
+  abm.e <- inner_join(abm[[1]],date_tab,by="t") %>% dplyr::select(ID,date,simulation,type,AER,qev34,diesel,gasoline,WLTP)
   #real-world emissions
-  abm.e <- abm[[1]] %>% dplyr::filter(type != "phev") %>% dplyr::mutate(e=WLTP) #add adustment?
-  abm.p <- abm[[1]] %>% dplyr::filter(type == "phev") %>% rowwise() %>% dplyr::mutate(e=e_phev(WLTP,AER,mileage_vals[qev34],xi))
-  abm.e <- dplyr::bind_rows(abm.e,abm.p) %>% dplyr::arrange(simulation,t)
-  abm.e <- abm.e %>% group_by_at(c("t","simulation",addvars)) %>% dplyr::summarise(WLTP_mean=mean(WLTP) ,e_real=mean(e), tCO2=sum(e*mileage_vals[qev34])/1e+6/12)
+  abm.e <- abm.e %>% arrange(simulation,date,ID)
+  abm.e <- abm.e %>% mutate(mileage=mileage_vals[qev34]) 
+  abm.e <- abm.e %>% dplyr::mutate(e=WLTP)  #add adustment?
+  if(epsilon != 0){
+  abm.e <- abm.e %>% dplyr::rowwise() %>% mutate(mileage=replace(mileage,type %in% c("diesel"),mileage_elastic(epsilon,qev34,diesel) ))
+  abm.e <- abm.e %>% dplyr::rowwise() %>% mutate(mileage=replace(mileage,type %in% c("gasoline","hev"),mileage_elastic(epsilon,qev34,gasoline) ))
+  }
+  abm.p <- abm.e %>% filter(type=="phev") %>% dplyr::mutate(e=replace(e,type=="phev",e_phev(WLTP,AER,mileage,xi)))
+  abm.e <- bind_rows(filter(abm.e, type != "phev"),abm.p) %>% arrange(simulation,date,ID)
+  #abm.e <- abm.e %>% rowwise() %>% dplyr::mutate(e=replace(e,type=="phev",e_phev(WLTP,AER,mileage_vals[qev34],xi)))
+  abm.e <- abm.e %>% group_by_at(c("date","simulation",addvars)) %>% dplyr::summarise(WLTP_mean=mean(WLTP) ,e_real=mean(e), tCO2=sum(e*mileage)/1e+6/924)
   abm.e <- distinct(abm.e)
-  abm.e <- inner_join(abm.e,date_tab,by="t") %>% distinct() %>% ungroup() %>% select("simulation","date",addvars,"WLTP_mean","e_real","tCO2")
+  #abm.e <- inner_join(abm.e,date_tab,by="") %>% ungroup() %>% select("simulation","date",addvars,"WLTP_mean","e_real","tCO2")
+  abm.e <- abm.e %>% ungroup() %>% select("simulation","date",addvars,"WLTP_mean","e_real","tCO2")
+
   #average over runs
   if(average_over_runs){
    abm.e <- abm.e %>% group_by_at(c("date",addvars)) %>% summarise(e_real=mean(e_real),tCO2=mean(tCO2))

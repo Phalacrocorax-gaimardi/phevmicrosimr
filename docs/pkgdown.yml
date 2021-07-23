@@ -2,23 +2,5 @@ pandoc: 2.7.2
 pkgdown: 1.6.1
 pkgdown_sha: ~
 articles: {}
-last_built: 2021-02-19T12:09Z
-reference:
-  - title: "Data"
-    desc: "Data inputs"
-  - contents:
-    - agents_init
-    - benfprices
-    - budget_vals
-    - fleet
-    - initial_fleet
-    - mileage_vals
-    - motortaxbands
-    - new_motortax_bands
-    - new_vrt_bands
-    - opec_oilprices
-    - scenario_1
-    - scenario_2
-    - uf_model_wide
-    - util_empirical
-    - zevgrantbands
+last_built: 2021-07-23T12:07Z
+

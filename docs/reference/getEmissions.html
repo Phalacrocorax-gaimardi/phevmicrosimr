@@ -116,6 +116,7 @@
   <span class='va'>abm</span>,
   addvars <span class='op'>=</span> <span class='cn'>NULL</span>,
   xi <span class='op'>=</span> <span class='fl'>1</span>,
+  epsilon <span class='op'>=</span> <span class='fl'>0</span>,
   average_over_runs <span class='op'>=</span> <span class='cn'>F</span>,
   emissions_start_date <span class='op'>=</span> <span class='cn'>NULL</span>
 <span class='op'>)</span></pre>
@@ -134,6 +135,10 @@
     <tr>
       <th>xi</th>
       <td><p>phev behavioural parameter xi=1 is optimal charging behaviour</p></td>
+    </tr>
+    <tr>
+      <th>epsilon</th>
+      <td><p>kilometer fuel price elasticity for ICEV drivers (typically -0.15)</p></td>
     </tr>
     <tr>
       <th>average_over_runs</th>

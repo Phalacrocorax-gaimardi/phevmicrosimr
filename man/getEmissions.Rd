@@ -8,6 +8,7 @@ getEmissions(
   abm,
   addvars = NULL,
   xi = 1,
+  epsilon = 0,
   average_over_runs = F,
   emissions_start_date = NULL
 )
@@ -18,6 +19,8 @@ getEmissions(
 \item{addvars}{vector of additional variables}
 
 \item{xi}{phev behavioural parameter xi=1 is optimal charging behaviour}
+
+\item{epsilon}{kilometer fuel price elasticity for ICEV drivers (typically -0.15)}
 
 \item{average_over_runs}{if FALSE return individual run emissions, otherwise average over runs}
 

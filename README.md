@@ -3,7 +3,7 @@ An agent-based micro-simulator for ZEV adoption
 # Installation
 ```
 library(devtools)
-install_githib("Phalacrocorax-gaimardi/phevmicrosimr")
+install_github("Phalacrocorax-gaimardi/phevmicrosimr")
 ```
 # Run
 ```

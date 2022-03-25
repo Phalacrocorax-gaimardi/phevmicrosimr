@@ -29,3 +29,6 @@ a randomly generated specific emissions in gCO2/km
 \description{
 gamma distribution of emissions above a cutoff corresponding to input mean emissions and standard deviation parameters. Dependence on mileage is modelled by a tanh function.
 }
+\examples{
+
+}

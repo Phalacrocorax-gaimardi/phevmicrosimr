@@ -9,5 +9,5 @@
 #'   \item{answer}{answer}
 #'   \item{shap}{SHAP contribution to utility prediction}
 #' }
-#' @source \url{Survey Model}
+#' @source <Survey Model>
 "util_empirical"

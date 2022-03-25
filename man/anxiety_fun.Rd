@@ -12,8 +12,11 @@ anxiety_fun(sD, yeartime)
 \item{yeartime}{real}
 }
 \value{
-real anxiety parameter for bevs
+real anxiety parameter for bevs. 1 is rational range anxiety, > 1 is irrational
 }
 \description{
 Range anxiety
+}
+\examples{
+anxiety_fun(scenario_B,2023)
 }

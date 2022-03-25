@@ -17,7 +17,7 @@ get_used_tech(sD, yeartime, vehicle_age = 4)
 current fleet data frame
 }
 \description{
-old fleet parameters at future or past times derived from adjusted 2021 fleet prices and tech. 
+available used fleet parameters at future or past times based on adjusted new fleet prices and tech.
 adjustments made include falling battery pack prices for EVs, efficiency (AER adjustments), ICEVs specific emissions reductions etc
 only models with model_start < yeartime are included
 }

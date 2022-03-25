@@ -13,12 +13,12 @@ tech_cost_fun(type, tech_cost, kWh = NA, params)
 
 \item{kWh}{battery}
 
-\item{params}{scenario params e.g. scenario_1}
+\item{params}{scenario params e.g. scenario_B}
 }
 \value{
 cost in euros
 }
 \description{
-technology costs based on 2021 pre-tax and incentive list prices. 
+technology costs based on 2021 pre-tax and incentive list prices.
 At present the cost model is based on battery pack price changes only.
 }

@@ -7,5 +7,5 @@
 #'   \item{date}{year}
 #'   \item{penetration}{BEV penetration at year end}
 #' }
-#' @source \url{cso}
+#' @source <cso>
 "bev_historical_uptake"

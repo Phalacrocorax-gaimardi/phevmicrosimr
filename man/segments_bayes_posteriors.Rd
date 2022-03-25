@@ -7,25 +7,25 @@
 \format{
 A data frame with 924 rows and 15 variables:
 \describe{
-  \item{ID}{agent ID}
-  \item{A}{A segment ownership probability}
-  \item{B}{B segment ownership probability}
-  \item{C}{B segment ownership probability}
-  \item{D}{B segment ownership probability}
-  \item{E}{B segment ownership probability}
-  \item{F}{B segment ownership probability}
-  \item{S}{B segment ownership probability}
-  \item{B-J}{B segment ownership probability}
-  \item{C-J}{B segment ownership probability}
-  \item{D-J}{B segment ownership probability}
-  \item{B-M}{B segment ownership probability}
-  \item{C-M}{B segment ownership probability}
-  \item{D-M}{B segment ownership probability}
-  \item{E-M}{B segment ownership probability}
+\item{ID}{agent ID}
+\item{A}{A segment ownership probability}
+\item{B}{B segment ownership probability}
+\item{C}{B segment ownership probability}
+\item{D}{B segment ownership probability}
+\item{E}{B segment ownership probability}
+\item{F}{B segment ownership probability}
+\item{S}{B segment ownership probability}
+\item{B-J}{B segment ownership probability}
+\item{C-J}{B segment ownership probability}
+\item{D-J}{B segment ownership probability}
+\item{B-M}{B segment ownership probability}
+\item{C-M}{B segment ownership probability}
+\item{D-M}{B segment ownership probability}
+\item{E-M}{B segment ownership probability}
 }
 }
 \source{
-\url{Data created from priors and likelihoods in ~/Policy/AgentBaseModels/PHEVs/survey_fleet.xlxs}
+<Data created from priors and likelihoods in ~/Policy/AgentBaseModels/PHEVs/survey_fleet.xlxs>
 }
 \usage{
 segments_bayes_posteriors

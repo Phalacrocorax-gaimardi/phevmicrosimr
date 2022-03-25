@@ -38,3 +38,7 @@ euros per litre
 \description{
 Retail fuel price formula. Does not distinguish between petrol and diesel.
 }
+\examples{
+diesel_price(50,10,0.012,100,0.54,0.02,0.014,0.23)
+
+}

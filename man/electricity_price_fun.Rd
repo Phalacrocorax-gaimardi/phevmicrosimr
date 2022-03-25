@@ -17,3 +17,7 @@ real
 \description{
 Electricity price euros/kWh
 }
+\examples{
+electricity_price_fun(scenario_B,2029)
+
+}

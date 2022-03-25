@@ -10,5 +10,5 @@
 #'   \item{motor}{annual payment in euros}
 #'
 #' }
-#' @source \url{revenue.ie}
+#' @source <revenue.ie>
 "new_motortax_bands"

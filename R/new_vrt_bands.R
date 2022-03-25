@@ -10,5 +10,5 @@
 #'   \item{rate}{VRT rate}
 #'
 #' }
-#' @source \url{revenue.ie}
+#' @source <revenue.ie>
 "new_vrt_bands"

@@ -8,5 +8,5 @@
 #'   \item{EUR}{EURUSD annual mean}
 #'   \item{price_euro}{euro/barrel}
 #' }
-#' @source \url{www.statistica.com}
+#' @source <www.statistica.com>
 "opec_oilprices"

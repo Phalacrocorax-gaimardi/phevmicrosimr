@@ -21,5 +21,5 @@
 #'   \item{D-M}{B segment ownership probability}
 #'   \item{E-M}{B segment ownership probability}
 #' }
-#' @source \url{Data created from priors and likelihoods in ~/Policy/AgentBaseModels/PHEVs/survey_fleet.xlxs}
+#' @source <Data created from priors and likelihoods in ~/Policy/AgentBaseModels/PHEVs/survey_fleet.xlxs>
 "segments_bayes_posteriors"

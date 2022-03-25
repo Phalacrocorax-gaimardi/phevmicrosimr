@@ -41,3 +41,6 @@ euros per litre
 \description{
 Retail diesel or gasoline price from scenario
 }
+\examples{
+
+}

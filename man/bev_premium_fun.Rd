@@ -2,7 +2,8 @@
 % Please edit documentation in R/technology.R
 \name{bev_premium_fun}
 \alias{bev_premium_fun}
-\title{BEV price premium (euros)}
+\title{BEV price premium (euros)
+NOT USED}
 \usage{
 bev_premium_fun(sD, yeartime)
 }
@@ -16,4 +17,8 @@ real
 }
 \description{
 BEV price premium (euros)
+NOT USED
+}
+\examples{
+
 }

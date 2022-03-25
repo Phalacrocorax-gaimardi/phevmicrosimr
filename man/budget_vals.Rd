@@ -7,7 +7,7 @@
 \format{
 A vector:
 \describe{
-  \item{}{}
+\item{}{}
 }
 }
 \source{

@@ -18,4 +18,10 @@ euros/barrel
 }
 \description{
 refining margin for diesel or gasoline
+includes historical estimate from fuelprices
+assumes diesel and gasoline spreads are the same
+}
+\examples{
+crackspread_fun("diesel",scenario_B,2025)
+
 }

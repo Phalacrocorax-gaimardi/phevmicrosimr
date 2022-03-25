@@ -15,5 +15,5 @@ range_factor_fun(sD, yeartime)
 unitless
 }
 \description{
-BEV range function factor
+BEV range function factor models efficiency improvements over time (i.e. km/kWh)
 }

@@ -17,3 +17,7 @@ real euros per km
 \description{
 energy cost of bev in euros/km
 }
+\examples{
+bev_fuelcost(scenario_B,2030)
+
+}

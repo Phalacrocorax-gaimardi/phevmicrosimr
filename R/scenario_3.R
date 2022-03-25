@@ -12,5 +12,5 @@
 #'   \item{comment}{comment}
 #'   
 #' }
-#' @source \url{various}
+#' @source <various>
 "scenario_3"

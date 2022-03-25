@@ -18,5 +18,5 @@ real (euros)
 }
 \description{
 Learning curve model based on historical BNEF survey prices with a production lag and a learning curve
- i.e. early 2019 production models reflect mid 2016 BNEF battery prices
+i.e. early 2019 production models reflect mid 2016 BNEF battery prices
 }

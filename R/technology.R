@@ -1,30 +1,26 @@
 #scenario_1 <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/scenarioDesignPHEV.xlsx",sheet=2)
 #scenario_2 <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/scenarioDesignPHEV.xlsx",sheet=3)
 #scenario_3 <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/scenarioDesignPHEV.xlsx",sheet=4)
-
+sD <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/scenarioDesignPHEV.xlsx",sheet="scenario_B")
 #use_data(scenario_3,overwrite=T)
 #use_data(scenario_2,overwrite=T)
 #use_data(scenario_1,overwrite=T)
-#fleet <- readxl::read_xlsx("~/Policy/AgentBasedModels/PHEVs/survey_fleet.xlsx",sheet=6, range="A1:P347")
+#fleet <- read_csv("~/Policy/AgentBasedModels/PHEVs/NOx/fleet_2021_nox_calculated.csv")
+#fleet_2022 <- read_csv("~/Policy/AgentBasedModels/PHEVs/NOx/fleet_2022_nox_calculated.csv")
 #bevs <- filter(fleet,type=="bev")
-#fleet <- fleet %>% filter(!is.na(`2021_rrp`))
-#fleet$kWh <- as.numeric(fleet$kWh)
-#fleet <- fleet %>% mutate(kWh=ifelse(!is.na(kWh),kWh,0))
-#fleet <- fleet %>% mutate(model_start=replace(model_start,is.na(model_start),1990))
-#fleet <- fleet %>% mutate(model_end= replace(model_end,is.na(model_end),3000))
 #use_data(fleet,overwrite = T)
+#use_data(fleet_2022,overwrite=T)
 
-
-get_fleet_data <- function(fleet_dirty){
+#get_fleet_data <- function(fleet_dirty){
   
-  fleet <- fleet %>% dplyr::filter(!is.na(`2021_rrp`))
-  fleet$kWh <- as.numeric(fleet$kWh)
-  fleet <- fleet %>% dplyr::mutate(kWh=ifelse(!is.na(kWh),kWh,0))
-  fleet <- fleet %>% dplyr::mutate(model_start=replace(model_start,is.na(model_start),1990))
-  fleet <- fleet %>% dplyr::mutate(model_end= replace(model_end,is.na(model_end),3000))
-  ifelse(any(is.na(fleet$tech_cost_2021)),print("bad input"),print("good input"))
-  return(fleet)
-}
+#  fleet <- fleet %>% dplyr::filter(!is.na(`2021_rrp`))
+#  fleet$kWh <- as.numeric(fleet$kWh)
+#  fleet <- fleet %>% dplyr::mutate(kWh=ifelse(!is.na(kWh),kWh,0))
+#  fleet <- fleet %>% dplyr::mutate(model_start=replace(model_start,is.na(model_start),1990))
+#  fleet <- fleet %>% dplyr::mutate(model_end= replace(model_end,is.na(model_end),3000))
+#  ifelse(any(is.na(fleet$tech_cost_2021)),print("bad input"),print("good input"))
+#  return(fleet)
+#}
 
 
 #' emissions_model1
@@ -41,6 +37,7 @@ get_fleet_data <- function(fleet_dirty){
 #' @export
 #'
 #' @examples
+#' 
 emissions_model1 <- function (mileage, mean_emissions=190, sd_emissions=30, e_cut=80,zeta=0.75) {
   #
   m_emissions <- mean_emissions + zeta*sd_emissions*tanh((mileage-10000)/20000)
@@ -51,8 +48,11 @@ emissions_model1 <- function (mileage, mean_emissions=190, sd_emissions=30, e_cu
 }
 
 
-
 #' Oil price scenario
+#'
+#' continuous time oil price (euro/bbl) based on monthly opec basket price (ORB) and monthly eurusd settlements from ecb
+#' this depends on assumed oil prices at of 2030 and 2050 from input scenario
+#'
 #'
 #' @param sD scenario dataframe
 #' @param yeartime real
@@ -60,23 +60,27 @@ emissions_model1 <- function (mileage, mean_emissions=190, sd_emissions=30, e_cu
 #' @return real
 #' @export
 #'
-#' @examples
+#' @examples 
+#' oil_price_fun(scenario_B,2023)
+#' 
 oil_price_fun <- function(sD,yeartime){
 
   crudeoilprice_2020 <- dplyr::filter(sD, parameter=="crudeoilprice_2020")$value
   crudeoilprice_2030 <- dplyr::filter(sD, parameter=="crudeoilprice_2030")$value
   crudeoilprice_2050 <- dplyr::filter(sD, parameter=="crudeoilprice_2050")$value
 
-  oil <- stats::approx(c(2015:2019+0.5,2030,2050),c(dplyr::filter(opec_oilprices, year %in% 2015:2019)$price_euro,crudeoilprice_2030,crudeoilprice_2050),xout=yeartime,rule=2)$y
+  oil <- stats::approx(c(lubridate::decimal_date(rev(fuelprices$date)),2031,2051),c(rev(fuelprices$opec_price/fuelprices$eur),crudeoilprice_2030,crudeoilprice_2050),xout=yeartime,rule=2)$y
+  #oil <- stats::approx(c(2015:2019+0.5,2030,2050),c(dplyr::filter(opec_oilprices, year %in% 2015:2019)$price_euro,crudeoilprice_2030,crudeoilprice_2050),xout=yeartime,rule=2)$y
   return(oil)
 
 }
 
 
-
 #' crackspread_fun
 #'
 #' refining margin for diesel or gasoline
+#' includes historical estimate from fuelprices
+#' assumes diesel and gasoline spreads are the same
 #'
 #' @param type diesel or gasoline
 #' @param sD scenario
@@ -86,13 +90,21 @@ oil_price_fun <- function(sD,yeartime){
 #' @export
 #'
 #' @examples
+#' crackspread_fun("diesel",scenario_B,2025)
+#' 
 crackspread_fun <- function(type,sD,yeartime){
-  if(!(type %in% c("diesel","gasoline"))) stop("bad fuel type")
-  if(type=="diesel") return( dplyr::filter(sD,parameter=="crackspread_diesel")$value)
-  if(type=="gasoline") return( dplyr::filter(sD,parameter=="crackspread_gasoline")$value)
+  #
+  #if(!(type %in% c("diesel","gasoline"))) stop("bad fuel type")
+  crackspread_2030 <- dplyr::case_when(type=="diesel"~ dplyr::filter(sD, parameter=="crackspread_diesel_2030")$value,
+                               type=="gasoline"~ dplyr::filter(sD, parameter=="crackspread_gasoline_2030")$value)
+  
+  crackspread_2050 <- dplyr::case_when(type=="diesel"~ dplyr::filter(sD, parameter=="crackspread_diesel_2050")$value,
+                                type=="gasoline"~ dplyr::filter(sD, parameter=="crackspread_gasoline_2050")$value)
+  
+  spread <- stats::approx(c(lubridate::decimal_date(rev(fuelprices$date)),2031,2051),c(rev(fuelprices$spread/fuelprices$eur),crackspread_2030,crackspread_2050),xout=yeartime,rule=2)$y
+  return(spread)
   
 }
-
 
 
 #' diesel_price
@@ -112,6 +124,8 @@ crackspread_fun <- function(type,sD,yeartime){
 #' @export
 #'
 #' @examples
+#' diesel_price(50,10,0.012,100,0.54,0.02,0.014,0.23)
+#' 
 diesel_price <- function(crudeoilprice=50,crackspread = 10, margin=0.12,carbon_tax=33.5, excise_duty=0.54, NORA=0.02, bio = 0.014, VAT=0.23){
    #euros per litre retail
   ((crudeoilprice+crackspread)/159+margin + excise_duty + carbon_tax/1000*2.640 + NORA)*(1+VAT)
@@ -137,12 +151,13 @@ diesel_price <- function(crudeoilprice=50,crackspread = 10, margin=0.12,carbon_t
 #' @export
 #'
 #' @examples
+#' 
 fuel_price_fun <- function(type="diesel",crudeoilprice=50,crackspread = 10, margin=0.12,carbon_tax=33.5, excise_duty=0.54, NORA=0.02, bio = 0.014, VAT=0.23){
   #euros per litre retail
   if(type=="diesel")
-  return(((crudeoilprice+crackspread)/159+margin + excise_duty + carbon_tax/1000*2.640 + NORA)*(1+VAT))
+  return(((crudeoilprice+crackspread)/159+margin + excise_duty + carbon_tax/1000*2.640 + NORA + bio)*(1+VAT))
   if(type=="gasoline")
-  return(((crudeoilprice+crackspread)/159+margin + excise_duty + carbon_tax/1000*2.392 + NORA)*(1+VAT))
+  return(((crudeoilprice+crackspread)/159+margin + excise_duty + carbon_tax/1000*2.392 + NORA + bio)*(1+VAT))
   
 }
 
@@ -159,23 +174,23 @@ fuel_price_fun <- function(type="diesel",crudeoilprice=50,crackspread = 10, marg
 #' @export
 #'
 #' @examples
+#' fuel_price_fun1("gasoline",scenario_B,2025)
+#' 
 fuel_price_fun1 <- function(type="diesel", sD, yeartime){
   
                crudeoilprice <- oil_price_fun(sD,yeartime)
                crackspread <- crackspread_fun(type=type,sD,yeartime)
                margin <- 0.12
                carbon_tax <- carbon_tax_fun(sD,yeartime)
-               excise_duty <- 
+               excise_duty <- 0.54
                NORA <- 0.02 
                bio <-  0.014
                VAT <- 0.23
                
-               if(type=="diesel")
-                 return(((crudeoilprice+crackspread)/159+margin + diesel_excise_duty_fun(sD,yeartime) + carbon_tax/1000*2.640 + NORA)*(1+VAT))
-               if(type=="gasoline")
-                 return(((crudeoilprice+crackspread)/159+margin + gasoline_excise_duty_fun(sD,yeartime) + carbon_tax/1000*2.392 + NORA)*(1+VAT))
+               price <- dplyr::case_when(type=="diesel"~((crudeoilprice+crackspread)/159+margin + excise_duty_fun(type,sD,yeartime) + carbon_tax/1000*2.640 + NORA + bio)*(1+VAT),
+                                         type=="gasoline"~((crudeoilprice+crackspread)/159+margin + excise_duty_fun(type,sD,yeartime) + carbon_tax/1000*2.392 + NORA + bio)*(1+VAT))
                
-
+               return(price)
 }
 
 
@@ -191,6 +206,8 @@ fuel_price_fun1 <- function(type="diesel", sD, yeartime){
 #' @export
 #'
 #' @examples
+#' bev_fuelcost(scenario_B,2030)
+#' 
 bev_fuelcost <- function(sD,yeartime){
 
   electricity_price_fun(sD,yeartime)*conversion_fun(sD,yeartime)
@@ -206,6 +223,8 @@ bev_fuelcost <- function(sD,yeartime){
 #' @export
 #'
 #' @examples
+#' conversion_fun(scenario_B,2026.5)
+#' 
 conversion_fun <- function(sD,yeartime){
   
   conv_2020 <- dplyr::filter(sD,parameter=="conversion_eff_2020")$value
@@ -232,6 +251,7 @@ conversion_fun <- function(sD,yeartime){
 #' @export
 #'
 #' @examples
+#' fuelcost_fun("diesel",120,0,0,scenario_params(scenario_B,2025.5),0)
 fuelcost_fun <- function(type,wltp=0,kWh, AER, params,xi=1){
   #
   dplyr::recode(type,
@@ -243,6 +263,7 @@ fuelcost_fun <- function(type,wltp=0,kWh, AER, params,xi=1){
 }
 
 #' BEV price premium (euros)
+#' NOT USED
 #'
 #' @param sD scenario dataframe
 #' @param yeartime real
@@ -251,6 +272,7 @@ fuelcost_fun <- function(type,wltp=0,kWh, AER, params,xi=1){
 #' @export
 #'
 #' @examples
+#' 
 bev_premium_fun <- function(sD,yeartime){
   #BEV premium over gasoline vehicle
   premium_yearzero <- dplyr::filter(sD,parameter=="premium_yearzero")$value
@@ -269,6 +291,8 @@ bev_premium_fun <- function(sD,yeartime){
 #' @export
 #'
 #' @examples
+#' electricity_price_fun(scenario_B,2029)
+#' 
 electricity_price_fun <- function(sD,yeartime){
 
   price_2020<-dplyr::filter(sD,parameter=="electricity_price_2020")$value
@@ -284,10 +308,11 @@ electricity_price_fun <- function(sD,yeartime){
 #' @param sD scenario dataframe
 #' @param yeartime real
 #'
-#' @return real anxiety parameter for bevs
+#' @return real anxiety parameter for bevs. 1 is rational range anxiety, > 1 is irrational
 #' @export
 #'
 #' @examples
+#' anxiety_fun(scenario_B,2023)
 anxiety_fun <- function(sD,yeartime){
 
   initial_range_anxiety <- dplyr::filter(sD,parameter=="initial_range_anxiety")$value
@@ -312,6 +337,7 @@ anxiety_fun <- function(sD,yeartime){
 #' @export
 #'
 #' @examples
+#' u_anxiety(20000,50,2.5,1.5)
 u_anxiety <- function(mileage,AER,shape=2.5,anxiety){
   #probability that a trip exceeds AER
   mean_daily <- mileage/300 #assume vehicle is driven 300 days per year
@@ -357,8 +383,11 @@ battery_cost_function <- function(sD,yeartime,nlag = 4.5){
   b1 <-dplyr::filter(sD,parameter=="cost_floor")$value
   b0 <- dplyr::filter(bnefprices, year==2020)$pack_ekWh-b1
   #build learning curve from 
-  if(yeartime >= 2020.5 + nlag) return(max(b1,b0*exp(-alpha*(yeartime-(2020.5+nlag))) + b1 ))  
-  if(yeartime <= 2020.5 + nlag) return(stats::approx(x=bnefprices$year+0.5,y=bnefprices$pack_ekWh, xout=yeartime-nlag)$y)
+  if(yeartime >= 2020.5 + nlag) cost <- max(b1,b0*exp(-alpha*(yeartime-(2020.5+nlag))) + b1 ) 
+  if(yeartime <= 2020.5 + nlag) cost <- stats::approx(x=bnefprices$year+0.5,y=bnefprices$pack_ekWh, xout=yeartime-nlag)$y
+  #cap battery price as bat_max = 265
+  #bat_max <- stats::approx(x=bnefprices$year+0.5,y=bnefprices$pack_ekWh, xout=2021-4.5)$y
+  return(min(cost,265))
   #if(yeartime < 2021 & yeartime >= 2018) return( 264.7*(1+0.05)^(2021-yeartime))
   #if(yeartime < 2018) return( 264.7*(1+0.15)^(2021-yeartime))
   
@@ -397,7 +426,7 @@ vkt_reduction_fun <- function(sD,mileage,yeartime){
 #' @param type powertrain/fuel type
 #' @param tech_cost 2021 technology cost
 #' @param kWh battery
-#' @param params scenario params e.g. scenario_1
+#' @param params scenario params e.g. scenario_B
 #'
 #' @return cost in euros
 #' @export
@@ -411,6 +440,7 @@ tech_cost_fun <- function(type,tech_cost,kWh=NA,params){
                 petrol= tech_cost,
                 hev = tech_cost +kWh*(params$battery_cost- params$battery_cost_2021),
                 phev = tech_cost+kWh*(params$battery_cost- params$battery_cost_2021),
+                #flat 2021 historic prices
                 bev = ifelse(params$yeartime >= 2021, tech_cost + kWh*(params$battery_cost- params$battery_cost_2021), tech_cost)
   )
   
@@ -420,7 +450,11 @@ tech_cost_fun <- function(type,tech_cost,kWh=NA,params){
 
 #' fleet_factor_fun
 #' 
-#' ICEV fleet emissions normalises to 2021 fleet WLTP values.
+#' ICEV fleet emissions technology improvement based on % reduction in WLTP values.
+#' This is applied to each ICEV model to project it forward and backwards in time.
+#' Backward projection from 2021, forward from 2022 i.e. fleet_factor = 1 for 2021 and 2022
+#' 
+#' 
 #'
 #' @param sD  scenario
 #' @param yeartime decimal time
@@ -437,14 +471,17 @@ fleet_factor_fun <- function(sD,yeartime){
     f3 <- dplyr::filter(sD,parameter=="fleet_factor_2015_2021")$value
     f4 <- dplyr::filter(sD,parameter=="fleet_factor_2021")$value
     y_end <- dplyr::filter(sD,parameter=="end_development_year")$value
-    g1 <- 1+18*f1
-    g2 <- g1*(1+7*f2)
-    g3 <- g2*(1+6*f3)
-    g4 <- g3*(1+(y_end-2020)*f4)
+    #g1 <- 1+18*f1 #length(1990:2007)
+    g1 <- (1+f1)^18
+    #g2 <- g1*(1+7*f2)
+    g2 <- g1*(1+f2)^7
+    #g3 <- g2*(1+6*f3)
+    g3 <- g2*(1+f3)^6
+    #g4 <- g3*(1+(y_end-2020)*f4)
+    g4 <- g3*(1+f4)^(y_end-2020)
     fact <- stats::approx(x=c(1990,2008,2015,2020,y_end),y=c(1,g1,g2,g3,g4),xout=yeartime,rule=2)$y
   return(fact)}
-  
-  return(func(sD,yeartime)/func(sD,2021))
+  ifelse(yeartime < 2022,return(func(sD,yeartime)/func(sD,2021)), return(func(sD,yeartime)/func(sD,2022)))
   
   
 }
@@ -452,7 +489,7 @@ fleet_factor_fun <- function(sD,yeartime){
 
 #' range_factor_fun
 #'
-#' BEV range function factor
+#' BEV range function factor models efficiency improvements over time (i.e. km/kWh)
 #'
 #' @param sD scenario
 #' @param yeartime decimal time
@@ -516,7 +553,7 @@ depreciation_spread_fun <- function(type,sD,yeartime){
 #' initialise_segments
 #' 
 #' extends agents_init with vehicle model & segment choice based on naive bayes classifier
-#' a car model is the assigned by on segment choice, observed Irish make preferences 2014-2019 & 2021, and 2021 new fleet dataframe
+#' A car model is the assigned by on segment choice, observed Irish make preferences 2014-2019 & 2021, and 2021 new fleet dataframe
 #'
 #'
 #' @param sD scenario (needed for historical fleet parameters)
@@ -528,20 +565,24 @@ depreciation_spread_fun <- function(type,sD,yeartime){
 initialise_segments <- function(sD){
   #2015 car fleet
   choose_initial_car <- function(seg,fuel){
+    #chooses a car from fleet weighted according to cso data initial_fleet
     #car segments and makes from cso 2014-2019
     init_car <- initial_fleet %>% dplyr::filter(segment==seg)
     #2021 fleet cars fossil only
     #fleet1 <- fleet %>% dplyr::filter(segment==seg, type %in% c("petrol","diesel"))
     fleet1 <- fleet %>% dplyr::filter(segment==seg, type == fuel)
     if(dim(fleet1)[1]==0) return("segment fuel cominbination not present in fleet")
-    fleet1 <- fleet1 %>% dplyr::select(segment,make,model,type,WLTP)
+    fleet1 <- fleet1 %>% dplyr::select(segment,make,model,type,wltp)
     init_car <- dplyr::filter(init_car, make %in% fleet1$make)
+    init_car <- init_car %>% dplyr::group_by(make) %>% dplyr::summarise(n=sum(number))
     #choose car weighted by cso probabilities
-    car_models <- dplyr::filter(fleet1,make==dplyr::slice_sample(init_car,n=1, weight_by = init_car$number)$make)
+    car_models <- dplyr::filter(fleet1,make==dplyr::slice_sample(init_car,n=1, weight_by = init_car$n)$make)
     #pick one if there are multiple options exist
     car_models <- car_models %>% dplyr::slice_sample(n=1)
     return(car_models)
   }
+  
+  #problem: too many diesels in B & B-J new priors 15/03/2022
   
   bay <- segments_bayes_posteriors %>% tidyr::pivot_longer(-ID,names_to="segment",values_to="prob")
   car_segments <- unique(bay$segment)
@@ -550,11 +591,9 @@ initialise_segments <- function(sD){
   agents_in1 <- dplyr::bind_cols(dplyr::select(agents_in1,-type0,-segment),dplyr::select(agents_in1,segment,type0) %>% dplyr::rowwise() %>% dplyr::do(choose_initial_car(.$segment,.$type0)))
   #assume new car drivers are driving 3 year old cars
   #used car drivers are driving 10 year old cars
-  agents_in1 <- agents_in1 %>% dplyr::mutate(WLTP = fleet_factor_fun(sD,reg)*WLTP)
+  agents_in1 <- agents_in1 %>% dplyr::mutate(wltp = fleet_factor_fun(sD,reg)*wltp)
   return(agents_in1)
 }
-
-
 
 
 #'scenario_params_df
@@ -589,10 +628,13 @@ scenario_params_df <- function(sD,yeartime){
   scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="deprec_hev", value =   dplyr::filter(sD, parameter=="depreciation_0")$value + depreciation_spread_fun("hev",sD,yeartime)))
   scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="deprec_phev", value =   dplyr::filter(sD, parameter=="depreciation_0")$value + depreciation_spread_fun("phev",sD,yeartime)))
   scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="deprec_bev", value =   dplyr::filter(sD, parameter=="depreciation_0")$value + depreciation_spread_fun("bev",sD,yeartime)))
+  scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="deprec_battery", value = dplyr::filter(sD, parameter=="depreciation_battery")$value ))
+  scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="battery_degrade", value = dplyr::filter(sD, parameter=="battery_degrade")$value ))
   scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="anxiety", value =   anxiety_fun(sD,yeartime)))
+  scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="tco_term", value =   dplyr::filter(sD, parameter=="term.")$value))
   scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="oil", value =  oil_price_fun(sD,yeartime)))
-  scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="excise_diesel", value =  diesel_excise_duty_fun(sD,yeartime)))
-  scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="excise_gasoline", value =  gasoline_excise_duty_fun(sD,yeartime)))
+  scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="excise_diesel", value =  excise_duty_fun("diesel",sD,yeartime)))
+  scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="excise_gasoline", value =  excise_duty_fun("gasoline",sD,yeartime)))
   scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="e_price", value =  electricity_price_fun(sD,yeartime)))
   scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="conversion", value =  conversion_fun(sD,yeartime)))
   scen <- dplyr::bind_rows(scen,tibble::tibble(parameter="ev_runcost", value =  bev_fuelcost(sD,yeartime)))
@@ -601,7 +643,7 @@ scenario_params_df <- function(sD,yeartime){
                                                                                     crackspread = crackspread_fun(type="diesel",sD,yeartime), 
                                                                                     margin=0.12,
                                                                                     carbon_tax=carbon_tax_fun(sD,yeartime),
-                                                                                    excise_duty =diesel_excise_duty_fun(sD,yeartime), 
+                                                                                    excise_duty =excise_duty_fun("diesel",sD,yeartime), 
                                                                                     NORA=0.02, 
                                                                                     bio = 0.014, 
                                                                                     VAT=0.23)))
@@ -610,7 +652,7 @@ scenario_params_df <- function(sD,yeartime){
                                                                                     crackspread = crackspread_fun(type="gasoline",sD,yeartime), 
                                                                                     margin=0.12,
                                                                                     carbon_tax=carbon_tax_fun(sD,yeartime),
-                                                                                    excise_duty = gasoline_excise_duty_fun(sD,yeartime),
+                                                                                    excise_duty = excise_duty_fun("gasoline",sD,yeartime),
                                                                                     NORA=0.02,
                                                                                     bio = 0.014,
                                                                                     VAT=0.23)))
@@ -639,11 +681,11 @@ scenario_params <- function(sD,yeartime){
 }
 
 
-#' get_current_tech
+#' get_newtech_2021
 #' 
-#' new fleet parameters at current (pre or post 2021) times derived from adjusted 2021 fleet prices and tech. 
+#' past (pre 2022) new fleet parameters derived from adjusted 2021 fleet prices and tech. 
 #' Adjustments made include falling battery pack prices for EVs, efficiency (AER adjustments), ICEVs specific emissions reductions etc
-#' only models with model_start < yeartime are included
+#' models with model_start > yeartime are excluded
 #'
 #' @param sD scenario dataframe
 #' @param yeartime decimal time
@@ -652,26 +694,80 @@ scenario_params <- function(sD,yeartime){
 #' @export
 #'
 #' @examples
-get_current_tech <- function(sD, yeartime){
-  
+get_newtech_2021 <- function(sD, yeartime){
+  #create new technology for 2021 and earlier
   params <- scenario_params(sD,yeartime)
-  flag0 <- ifelse(yeartime >= 2021, "new","old")
-  fleet1 <- fleet %>% dplyr::select(c(-motor,-vrt,-`2021_rrp`,-`2021_rrp*`,-`comment`,-`kWh/100km`)) 
-  fleet1 <- fleet1 %>% dplyr::filter(yeartime >= model_start & yeartime < (model_end+1))
-  tech <- fleet1 %>% dplyr::rowwise() %>% dplyr::mutate(p_0=tech_cost_fun(type=type,tech_cost=tech_cost_2021,kWh=kWh,params) )
-  tech <- tech %>% dplyr::mutate(p_1=p_0*(1+params$car_vat)/(1-0.9*vrt_rate(WLTP,flag0)))
-  tech <- tech %>% dplyr::mutate(p_2 = p_1-incentives_fun(type,p_1,params,flag0,WLTP,new_used="new_car"))
+  #flag0 <- ifelse(yeartime >= 2021, "new","old")
+  flag0 <- flagr(yeartime)
+   fleet1 <- fleet %>% dplyr::select(c(-motor,-vrt,-p_1,-p_2,-`comment`)) 
+   fleet1 <- fleet1 %>% dplyr::filter(yeartime >= model_start & yeartime < (model_end+1))
+   #update cost model (assumed to be battery costs only)
+   tech <- fleet1 %>% dplyr::rowwise() %>% dplyr::mutate(p_0=tech_cost_fun(type=type,tech_cost=p_0,kWh=kWh,params) )
+   #update wltp
+   tech <- tech %>% dplyr::rowwise() %>% dplyr::mutate(wltp=params$fleet_factor*wltp,AER=params$range_factor*AER)
+   tech <- tech %>% dplyr::mutate(p_1=p_0*(1+params$car_vat)/(1-0.9*vrt_rate(wltp,flag0)))
+   tech <- tech %>% dplyr::mutate(p_2 = p_1-incentives_fun(type,p_1,params,wltp,new_used="new_car"))
+   #adjust fleet emissions & vehicle range 
+   #use UF for 
+   return(dplyr::select(tech,make,model,segment,type,p_0,p_1,p_2,wltp,kWh,AER,model_start,model_end))
+  
+}
+
+
+#' get_newtech_2022
+#' 
+#' future (post 2021) new fleet parameters derived by adjusting adjusting 2022 fleet prices and tech. 
+#' Adjustments include falling battery pack prices for EVs, efficiency (AER adjustment), ICEV specific emissions reductions (described by fleet_factor_fun).
+#'
+#' @param sD scenario dataframe
+#' @param yeartime decimal time
+#'
+#' @return a new car fleet data frame
+#' @export
+#'
+#' @examples
+get_newtech_2022 <- function(sD, yeartime){
+  #create new technology for 2021 and earlier
+  params <- scenario_params(sD,yeartime)
+  #flag0 <- ifelse(yeartime >= 2021, "new","old")
+  flag0 <- flagr(yeartime)
+  fleet1 <- fleet_2022 %>% dplyr::select(c(-motor,-vrt,-p_1,-p_2,-`comment`)) 
+  #fleet1 <- fleet1 %>% dplyr::filter(yeartime >= model_start & yeartime < (model_end+1))
+  #update cost model (assumed to be battery costs only)
+  tech <- fleet1 %>% dplyr::rowwise() %>% dplyr::mutate(p_0=tech_cost_fun(type=type,tech_cost=p_0,kWh=kWh,params) )
+  #update wltp
+  tech <- tech %>% dplyr::rowwise() %>% dplyr::mutate(wltp=params$fleet_factor*wltp,AER=params$range_factor*AER)
+  tech <- tech %>% dplyr::mutate(p_1=p_0*(1+params$car_vat)/(1-0.9*vrt_rate(wltp,flag0)))
+  tech <- tech %>% dplyr::mutate(p_2 = p_1-incentives_fun(type,p_1,params,wltp,new_used="new_car"))
   #adjust fleet emissions & vehicle range 
   #use UF for 
-  tech <- tech %>% dplyr::mutate(WLTP = params$fleet_factor*WLTP, AER=params$range_factor*AER)
-  return(dplyr::select(tech,make,model,segment,type,WLTP,kWh,AER,p_0,p_1,p_2))
+  return(dplyr::select(tech,make,model,segment,type,p_0,p_1,p_2,wltp,kWh,AER))
+  
+}
+
+
+#' get_newtech
+#' 
+#' New technology dataframe available at yeartime based on 2021 and 2022 new car fleets. 
+#' The 2021 fleet is used to project backwards and the 2022 fleet is used to project forwards in time
+#'
+#' @param sD scenario
+#' @param yeartime decimal time
+#'
+#' @return new car fleet at yeartime
+#' @export
+#'
+#' @examples
+get_newtech <- function(sD,yeartime){
+  
+  ifelse(yeartime >= 2022, return(get_newtech_2022(sD,yeartime)), return(get_newtech_2021(sD,yeartime)))
   
 }
 
 
 #' get_used_tech
 #' 
-#' old fleet parameters at future or past times derived from adjusted 2021 fleet prices and tech. 
+#' available used fleet parameters at future or past times based on adjusted new fleet prices and tech. 
 #' adjustments made include falling battery pack prices for EVs, efficiency (AER adjustments), ICEVs specific emissions reductions etc
 #' only models with model_start < yeartime are included
 #'
@@ -685,20 +781,38 @@ get_current_tech <- function(sD, yeartime){
 #' @examples
 get_used_tech <- function(sD, yeartime, vehicle_age=4){
   
-  params <- scenario_params(sD,yeartime) #tax parameters taken at yeartime
-  params_old <- scenario_params(sD,yeartime-vehicle_age) #technical parameters taken at yeartime-vehicle_age
+  #used cars are assumed to be imported
+  params <- scenario_params(sD,yeartime) #parameters taken at yeartime
+  params_old <- scenario_params(sD,yeartime-vehicle_age) #technical parameters when vehicle was new
+  #use 2021 or 2022 fleets
+  if(yeartime-vehicle_age >= 2022) {
+    tech <- get_newtech_2022(sD,yeartime-vehicle_age)
+  }
+  if(yeartime-vehicle_age < 2022) {
+    tech <- get_newtech_2021(sD,yeartime-vehicle_age)
+    tech <- tech %>% dplyr::filter(yeartime - vehicle_age >= model_start & yeartime - vehicle_age < (model_end+1))
+  }
+  #current technology and pricing 
+  #bev depreciation includes additional depreciation due to falling battery price
   deprc <- (1-params$deprec_0)^vehicle_age #assume same depreciation for all vehicles including zevs (i.e. risk premium is absent)
-  flag0 <- ifelse(yeartime >= 2021, "new","old") #old or new tax regime  at time of import
-  fleet1 <- fleet %>% dplyr::select(c(-motor,-vrt,-`2021_rrp`,-`2021_rrp*`,-`comment`,-`kWh/100km`)) 
-  fleet1 <- fleet1 %>% dplyr::filter(yeartime - vehicle_age >= model_start & yeartime - vehicle_age < (model_end+1))
-  #depreciation based on current technology cost of vehicle
-  tech <- fleet1 %>% dplyr::rowwise() %>% dplyr::mutate(p_0=deprc*tech_cost_fun(type=type,tech_cost=tech_cost_2021,kWh=kWh,params) )
-  #treat an import
-  tech <- tech %>% dplyr::mutate(p_1=p_0*(1+params$car_vat)/(1-0.9*vrt_rate(WLTP,flag0)))
-  #apply vrt rebate incentives but not SEAI grant
-  tech <- tech %>% dplyr::mutate(p_2 = p_1-incentives_fun(type,p_1,params,flag0,WLTP,new_used="used_car"))
-  tech <- tech %>% dplyr::mutate(WLTP = params$fleet_factor*WLTP,AER=params_old$range_factor*AER)
-  return(dplyr::select(tech,make,model,segment,type,WLTP,kWh,AER,p_0,p_1,p_2))
+  deprc_bat <- (1-params$deprec_battery)^vehicle_age
+  degrade <- params$battery_degrade^vehicle_age
+  flag0 <- flagr(yeartime) #old, 2021 or new tax regime  at time of vehicle import
+ 
+  #depreciate technology cost at current battery market price
+  #this includes battery price falls
+  tech <- tech %>% dplyr::rowwise() %>% dplyr::mutate(p_0=replace(p_0,type %in% c("hev","diesel","petrol"),deprc*p_0))
+  #battery value is depreciated at current cost
+  tech <- tech %>% dplyr::rowwise() %>% dplyr::mutate(p_0=replace(p_0,type %in% c("bev","phev"),deprc*(p_0 - kWh*params_old$battery_cost) + deprc_bat*kWh*params$battery_cost ))
+  #degrade
+  tech <- tech %>% dplyr::mutate(wltp = params$fleet_factor*wltp,kWh=degrade*kWh,AER=degrade*params_old$range_factor*AER)
+  
+  #treat as fresh import
+  
+  tech <- tech %>% dplyr::mutate(p_1=p_0*(1+params$car_vat)/(1-0.9*vrt_rate(wltp,flag0)))
+  #"used_car" flag applied vrt rebate but not SEAI grant
+  tech <- tech %>% dplyr::mutate(p_2 = p_1-incentives_fun(type,p_1,params,wltp,new_used="used_car"))
+  return(dplyr::select(tech,make,model,segment,type,p_0,p_1,p_2,wltp,kWh,AER))
   
 }
 
@@ -731,23 +845,25 @@ update_agents4 <- function(sD,yeartime,agents_in, social_network){
 
   #parameters from scenario corresponding to yeartime
   params <- scenario_params(sD,yeartime) #enviroment object
-  #depreciation vector
-  deprc_vals <- list("petrol"=(1-params$deprec_0)^3,
-                      "diesel"=(1-params$deprec_diesel)^3,
-                      "hev"=(1-params$deprec_hev)^3,
-                      "phev"=(1-params$deprec_phev)^3,
-                      "bev" = (1-params$deprec_bev)^3
+  tco_term <- params$tco_term
+  
+  #depreciation vector over 3-year (for TCO)
+  deprc_vals <- list("petrol"=(1-params$deprec_0)^tco_term,
+                      "diesel"=(1-params$deprec_diesel)^tco_term,
+                      "hev"=(1-params$deprec_hev)^tco_term,
+                      "phev"=(1-params$deprec_phev)^tco_term,
+                      "bev" = (1-params$deprec_bev)^tco_term
                       )
   
-  depr_ev <- (1-params$deprec_ev)^3
-  depr <- (1-params$deprec_0)^3
+  depr_ev <- (1-params$deprec_ev)^tco_term
+  depr <- (1-params$deprec_0)^tco_term
   #modify mileage (VKT policy)
   #mileage_vkt <- mileage_vals * sapply(mileage_vals, function(m) vkt_reduction_fun(sD,m,yeartime))
 
-  flag <- ifelse(yeartime < 2021,"old","new") #whether to use old or new tax bands
+  flag <- flagr(yeartime) #whether to use old, 2021 or new budget 2022 tax bands
 
   #current fleet parameters
-  new_tech <- get_current_tech(sD,yeartime)
+  new_tech <- get_newtech(sD,yeartime)
   #4 year old vehicles
   used_car_age_fun <- function(){
     
@@ -765,14 +881,16 @@ update_agents4 <- function(sD,yeartime,agents_in, social_network){
   b_s <- b_s %>% dplyr::mutate(transaction=T)
   #
   model_choice <- function(tech,seg,ntype=2){
-    #car selection
+    #stochastic car selection??
     #ntype is the max number of each type in selection
+    #no_select <- function(){}
     dplyr::filter(tech, segment == seg)  %>% dplyr::group_by(type) %>% dplyr::slice_sample(n=ntype,replace=T) %>% dplyr::distinct()
   }
   
   #make
-  update_cars <- function(b_s,params,flag){
+  update_cars <- function(b_s,params){
     #compute full utilities
+    flag <- flagr(params$yeartime)
     choices <- vector("list",dim(b_s)[1])
     b_s <- b_s %>% dplyr::rename(old_type=type)
     for(i in 1:dim(b_s)[1]){
@@ -784,7 +902,7 @@ update_agents4 <- function(sD,yeartime,agents_in, social_network){
        models <- models %>% dplyr::rowwise() %>% dplyr::mutate(reg=ifelse(qev31 != 1,trunc(yeartime-used_car_age),trunc(yeartime)))
        #TCO discount cost: buyers assume they capture incentives but subsequent purchaser does not
        #distinct 3 year values for each type
-       models <- models %>% dplyr::rowwise() %>% dplyr::mutate(u_econ=-w_econ*beta.*((p_2-deprc_vals[[type]]*p_1)/3 + fuelcost_fun(type,WLTP,kWh,AER,params)*mileage_vals[qev34] + motor_tax(WLTP,flag))/budget_vals[qev32])
+       models <- models %>% dplyr::rowwise() %>% dplyr::mutate(u_econ=-w_econ*beta.*((p_2-deprc_vals[[type]]*p_1)/3 + fuelcost_fun(type,wltp,kWh,AER,params)*mileage_vals[qev34] + motor_tax(wltp,flag))/budget_vals[qev32])
        models <- models %>% dplyr::rowwise() %>% dplyr::mutate(u_social=ifelse(type=="bev", dU_social[min(qev29,3)],0))
        models <- models %>% dplyr::rowwise() %>% dplyr::mutate(u_enviro=ifelse(type=="bev" & old_type != "bev", w_enviro*dU_enviro[q17a_2],0))
        #range anxiety term - tends to be zero or dominant
@@ -793,6 +911,7 @@ update_agents4 <- function(sD,yeartime,agents_in, social_network){
       #assume no barrier from PHEV to BEV (other than range anxiety)
        models <- models %>% dplyr::mutate(theta =0)
       models <- models %>% dplyr::rowwise() %>% dplyr::mutate(theta = replace(theta,type=="bev" & old_type %in% c("petrol","diesel","hev"),-w_theta*(theta.) + lambda.))
+      models <- models %>% dplyr::select(-any_of(c("model_start","model_end")))
       models <- models[,12:27] %>% dplyr::rowwise() %>% dplyr::mutate(u=u_econ+u_social+u_enviro+u_anx+theta)
       #add hedonic term that penalises cars cheaper than budget?
       #add brand loyalty effect to prevent skodaisation
@@ -804,7 +923,7 @@ update_agents4 <- function(sD,yeartime,agents_in, social_network){
     return(dplyr::bind_cols(dplyr::select(b_s, ID,w_econ,w_social,w_enviro,w_distance,w_theta, qev32,qev29,q17a_2,qev34,qev31,transaction),choices[,1:11]) )                                        
   }
   
-  b_s <- update_cars(b_s,params,flag)
+  b_s <- update_cars(b_s,params)
   
   a_s <- dplyr::filter(a_s, !(ID %in% b_s$ID))
   a_s <- dplyr::bind_rows(a_s,b_s) %>% dplyr::arrange(as.numeric(ID))
@@ -831,18 +950,22 @@ update_agents4 <- function(sD,yeartime,agents_in, social_network){
 #' @param simulation_end the final year of simulation of early termination is required
 #' @param resample_society if TRUE resample society with replacement to capture additional variability
 #' @param n_unused_cores number of cores left unused in parallel/foreach. Recommended values 2 or 1.
+#' @param use_parallel if TRUE uses multiple cores. Use FALSE for diagnostic runs
 #'
 #' @return a three component list - simulation output, scenario setup, meta-parameters
 #' @export
 #' @importFrom magrittr %>%
 #' @importFrom foreach %dopar%
-#' @examples
-runABM <- function(sD, Nrun=1,simulation_end=end_year,resample_society=F,n_unused_cores=2){
+#' 
+runABM <- function(sD, Nrun=1,simulation_end=end_year,resample_society=F,n_unused_cores=2, use_parallel=T){
   #
+  year_zero <- 2015
   Nt <- round((simulation_end-year_zero+1)*12)
   #comment out net line for parallel
   #abm <- tibble::tibble()
   #comment in next two lines for parallel
+  if(use_parallel){
+    
   number_of_cores <- parallel::detectCores() - n_unused_cores
   doParallel::registerDoParallel(number_of_cores)
 
@@ -852,12 +975,12 @@ runABM <- function(sD, Nrun=1,simulation_end=end_year,resample_society=F,n_unuse
   abm <- foreach::foreach(j = 1:Nrun, .combine=dplyr::bind_rows,.export = c("initialise_segments","update_agents4")) %dopar% {
     #create a new artificial society for each run
     print(paste("Generating network for run",j,"...."))
-    if(!resample_society) social <- microsim::createArtificalSociety(microsim::society,microsim::homophily,4.5)
+    if(!resample_society) social <- createArtificalSociety(society,homophily,4.5)
     if(resample_society){
       agent_resample <- sample(1:924,replace=T)
-      society_new <- microsim::society[agent_resample,]
+      society_new <- society[agent_resample,]
       society_new$ID <- 1:924
-      social <- microsim::createArtificalSociety(society_new,microsim::homophily,4.5)
+      social <- createArtificalSociety(society_new,homophily,4.5)
 
     }
     #randomiise ICEV emissions assignment
@@ -889,6 +1012,60 @@ runABM <- function(sD, Nrun=1,simulation_end=end_year,resample_society=F,n_unuse
   }
   meta <- tibble::tibble(parameter=c("Nrun","end_year","beta.","lambda.","A_bat","B_bat","M_bat","p.","wltp_nedc_ratio"),value=c(Nrun,end_year,beta.,lambda.,A_bat,B_bat,M_bat,p.,wltp_nedc_ratio))
   return(list("abm"=abm,"scenario"=sD,"system"=meta))
+  }
+  
+  #abm <- tibble::tibble()
+  #comment in next two lines for parallel
+  if(!use_parallel){
+    abm<- tibble::tibble()
+    #number_of_cores <- parallel::detectCores() - n_unused_cores
+    #doParallel::registerDoParallel(number_of_cores)
+    
+    #comment out next line for parallel
+    for(j in 1:Nrun){
+    #comment in next line for parallel
+    #abm <- foreach::foreach(j = 1:Nrun, .combine=dplyr::bind_rows,.export = c("initialise_segments","update_agents4")) %dopar% {
+      #create a new artificial society for each run
+      print(paste("Generating network for run",j,"...."))
+      if(!resample_society) social <- createArtificalSociety(society,homophily,4.5)
+      if(resample_society){
+        agent_resample <- sample(1:924,replace=T)
+        society_new <- society[agent_resample,]
+        society_new$ID <- 1:924
+        social <- phevmicrosimr::createArtificalSociety(society_new,homophily,4.5)
+        
+      }
+      #randomise ICEV emissions assignment
+      #choose market segment for each agent
+      agents_in <- initialise_segments(sD)
+      #no transactions
+      agents_in$transaction <- FALSE
+      #fraction of agents who are uncertain who buy a new car
+      r_new <- dplyr::filter(sD,parameter=="r_new")$value
+      agents_in <- agents_in %>% dplyr::rowwise() %>% dplyr::mutate(qev31 = replace(qev31, qev31==3, sample(c(1,2),1,prob=c(r_new,1-r_new))))
+      agents_in <- dplyr::ungroup(agents_in)
+      agent_ts<- vector("list",Nt)
+      agent_ts[[1]] <- agents_in #agent paraneters with regularized weights
+      
+      for(t in seq(2,Nt)){
+        #
+        yeartime <- year_zero+(t-1)/12
+        agent_ts[[t]] <- update_agents4(sD,yeartime,agent_ts[[t-1]],social_network=social) #static social network, everything else static
+        #agent_ts[[t]] <- tibble::tibble(t=t)
+      }
+      
+      for(t in 1:Nt) agent_ts[[t]]$t <- t
+      agent_ts <- tibble::as_tibble(data.table::rbindlist(agent_ts,fill=T))
+      agent_ts$simulation <- j
+      #comment out next line for parallel
+      abm <- dplyr::bind_rows(abm,agent_ts)
+      #comment in next line for parallel
+      #agent_ts
+    }
+    meta <- tibble::tibble(parameter=c("Nrun","end_year","beta.","lambda.","A_bat","B_bat","M_bat","p.","wltp_nedc_ratio"),value=c(Nrun,end_year,beta.,lambda.,A_bat,B_bat,M_bat,p.,wltp_nedc_ratio))
+    return(list("abm"=abm,"scenario"=sD,"system"=meta))
+  }
+  
 }
 
 

@@ -15,5 +15,7 @@ fleet_factor_fun(sD, yeartime)
 emissions relative to 2021 value
 }
 \description{
-ICEV fleet emissions normalises to 2021 fleet WLTP values.
+ICEV fleet emissions technology improvement based on \% reduction in WLTP values.
+This is applied to each ICEV model to project it forward and backwards in time.
+Backward projection from 2021, forward from 2022 i.e. fleet_factor = 1 for 2021 and 2022
 }

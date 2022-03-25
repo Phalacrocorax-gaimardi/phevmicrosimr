@@ -15,5 +15,10 @@ oil_price_fun(sD, yeartime)
 real
 }
 \description{
-Oil price scenario
+continuous time oil price (euro/bbl) based on monthly opec basket price (ORB) and monthly eurusd settlements from ecb
+this depends on assumed oil prices at of 2030 and 2050 from input scenario
+}
+\examples{
+oil_price_fun(scenario_B,2023)
+
 }

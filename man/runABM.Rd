@@ -9,7 +9,8 @@ runABM(
   Nrun = 1,
   simulation_end = end_year,
   resample_society = F,
-  n_unused_cores = 2
+  n_unused_cores = 2,
+  use_parallel = T
 )
 }
 \arguments{
@@ -22,6 +23,8 @@ runABM(
 \item{resample_society}{if TRUE resample society with replacement to capture additional variability}
 
 \item{n_unused_cores}{number of cores left unused in parallel/foreach. Recommended values 2 or 1.}
+
+\item{use_parallel}{if TRUE uses multiple cores. Use FALSE for diagnostic runs}
 }
 \value{
 a three component list - simulation output, scenario setup, meta-parameters

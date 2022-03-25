@@ -11,5 +11,5 @@
 #'   \item{rate_vrt}{units}
 #'   \item{min_vrt}{source etc}
 #' }
-#' @source \url{www.motortax.ie}
+#' @source <www.motortax.ie>
 "motortaxbands"

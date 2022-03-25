@@ -17,3 +17,7 @@ value of interpolated conversion efficiency in kWh/km at yeartime
 \description{
 conversion_fun
 }
+\examples{
+conversion_fun(scenario_B,2026.5)
+
+}

@@ -1,0 +1,18 @@
+#' Monthly mean fuel price and related data from Jan 2003
+#'
+#'
+#' @format A data frame with 229 rows and 10 variables:
+#' \describe{
+#'   \item{date}{month}
+#'   \item{diesel}{Irish euro/barrel pump price from AA survey}
+#'   \item{petrol}{Irish euro/barrel pump price from AA survey}
+#'   \item{dieselexcise}{exise on petrol}
+#'   \item{petrolexcise}{excise on petrol}
+#'   \item{carbontax}{carbon tax component of motor oil tax}
+#'   \item{opec_price}{monthly average of ORB opec basket price}
+#'   \item{brent_spot}{monthly average of Brent spot price}
+#'   \item{spread}{inferred crack spread for gasoline from US EIA monthly data}
+#'   \item{eur}{monthly average EURUSD from ECB daily closing prices}
+#' }
+#' @source opec ORB basket, AA.ie, EIA, ECB
+"fuelprices"

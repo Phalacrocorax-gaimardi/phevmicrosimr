@@ -4,7 +4,7 @@
 \alias{vrt_rebate}
 \title{vrt_rebate}
 \usage{
-vrt_rebate(type, omsp, params, flag)
+vrt_rebate(type, omsp, params)
 }
 \arguments{
 \item{type}{vehicle type bev,phev, hev, diesel, petrol}
@@ -12,8 +12,6 @@ vrt_rebate(type, omsp, params, flag)
 \item{omsp}{approximated by budget + dP_0}
 
 \item{params}{hashed parameter object}
-
-\item{flag}{old or new basis}
 }
 \value{
 amount in euros

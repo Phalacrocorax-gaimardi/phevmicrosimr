@@ -22,3 +22,6 @@ probabilty that a daily trip exceeds AER
 Range anxiety is assumed to reflect the probability that the daily trip exceeds the electric vehicle AER, requiring a charge.
 the distribution of daily trips is gamma distributed with shape parameter 2.5. subjectivity via "anxiety" parameter anxiety
 }
+\examples{
+u_anxiety(20000,50,2.5,1.5)
+}

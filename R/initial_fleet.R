@@ -10,5 +10,5 @@
 #'   \item{number}{number purchased}
 #'   \item{segment}{segment}
 #' }
-#' @source \url{www.cso.ie}
+#' @source <www.cso.ie>
 "initial_fleet"

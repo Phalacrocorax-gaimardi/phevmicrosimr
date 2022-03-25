@@ -11,7 +11,7 @@ vrt(price, emissions, flag)
 
 \item{emissions}{WLTP emissions gCO2/km}
 
-\item{flag}{old or new vrt}
+\item{flag}{old, 2021, or new vrt}
 }
 \value{
 amount in euros

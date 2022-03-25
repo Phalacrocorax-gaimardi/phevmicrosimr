@@ -14,5 +14,5 @@ utilisation factor 0-1
 }
 \description{
 utility factor from phev all electric range
-https://circabc.europa.eu/sd/a/92324676-bd8c-4075-8301-6caf12283beb/Technical%20Report_UF_final.pdf
+https://circabc.europa.eu/sd/a/92324676-bd8c-4075-8301-6caf12283beb/Technical\%20Report_UF_final.pdf
 }

@@ -4,18 +4,16 @@
 \alias{incentives_fun}
 \title{incentives_fun}
 \usage{
-incentives_fun(type, p1, params, flag, WLTP, new_used)
+incentives_fun(type, p_1, params, wltp, new_used)
 }
 \arguments{
 \item{type}{fuel/powertrain}
 
-\item{p1}{unsubsidised price (including VAT and VRT)}
+\item{p_1}{unsubsidised price (including VAT and VRT)}
 
 \item{params}{hashed parameter values}
 
-\item{flag}{new or old taxation basis}
-
-\item{WLTP}{gCO2/km}
+\item{wltp}{gCO2/km}
 
 \item{new_used}{new or used vehicle, values "new_car" or "used_car"}
 }

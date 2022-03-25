@@ -25,3 +25,6 @@ real euros/km
 \description{
 ICEV fuel cost in euros/km
 }
+\examples{
+fuelcost_fun("diesel",120,0,0,scenario_params(scenario_B,2025.5),0)
+}

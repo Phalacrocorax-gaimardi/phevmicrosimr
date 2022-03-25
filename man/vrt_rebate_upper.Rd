@@ -15,5 +15,5 @@ vrt_rebate_upper(sD, yeartime)
 euros
 }
 \description{
-The lower rebate window, set to 10,000 euros in 2021. VRT rebate is 50% between vrt_rebate_lower and vrt_rebate_lower + vrt_rebate_upper
+The lower rebate window, set to 10,000 euros in 2021. VRT rebate is 50\% between vrt_rebate_lower and vrt_rebate_lower + vrt_rebate_upper
 }

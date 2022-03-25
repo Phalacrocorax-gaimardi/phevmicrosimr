@@ -19,3 +19,7 @@ euros per litre
 \description{
 cost of motor fuels at yeartime
 }
+\examples{
+fuel_price_fun1("gasoline",scenario_B,2025)
+
+}

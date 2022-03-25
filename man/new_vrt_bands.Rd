@@ -7,15 +7,15 @@
 \format{
 A data frame with 21 rows and 4 variables:
 \describe{
-  \item{band}{number}
-  \item{lower}{lower limit}
-  \item{upper}{upper limit}
-  \item{rate}{VRT rate}
+\item{band}{number}
+\item{lower}{lower limit}
+\item{upper}{upper limit}
+\item{rate}{VRT rate}
 
 }
 }
 \source{
-\url{revenue.ie}
+<revenue.ie>
 }
 \usage{
 new_vrt_bands

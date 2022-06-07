@@ -15,5 +15,5 @@ e_ice(wltp, AER)
 gCO2/km
 }
 \description{
-emissions from a charged depleted phev based in European utility factor with behavioural adjustment xi
+emissions from a charged depleted phev based in European utility factor
 }

@@ -27,7 +27,7 @@ getEmissions(
 \item{emissions_start_date}{start date for cumulative emissions calculation}
 }
 \value{
-
+a dataframe
 }
 \description{
 Monthly and cumulative emissions for a set of model runs

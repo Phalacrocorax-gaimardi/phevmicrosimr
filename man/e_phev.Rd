@@ -11,7 +11,7 @@ e_phev(wltp, AER, mileage, xi = 1)
 
 \item{AER}{all electric range}
 
-\item{mileage}{km from mileage_vals}
+\item{mileage}{annual km}
 
 \item{xi}{charging behaviour 0.25,0.5,0.75,1}
 }

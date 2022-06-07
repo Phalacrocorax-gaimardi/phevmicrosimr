@@ -17,5 +17,5 @@ current fleet data frame
 \description{
 past (pre 2022) new fleet parameters derived from adjusted 2021 fleet prices and tech.
 Adjustments made include falling battery pack prices for EVs, efficiency (AER adjustments), ICEVs specific emissions reductions etc
-models with model_start > yeartime are excluded
+models with model_start > yeartime are excluded. separate deflation rates of prices for new tech (hev, phev and bevs) are allowed
 }

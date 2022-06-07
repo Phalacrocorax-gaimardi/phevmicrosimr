@@ -19,6 +19,7 @@ tech_cost_fun(type, tech_cost, kWh = NA, params)
 cost in euros
 }
 \description{
-technology costs based on 2021 pre-tax and incentive list prices.
-At present the cost model is based on battery pack price changes only.
+technology costs based on 2021 or 2022 fleets (pre-tax and incentive list prices).
+The cost model is based on battery pack price changes post 2022.
+Pre-2021 technology costs is based on deflation rate inputs
 }

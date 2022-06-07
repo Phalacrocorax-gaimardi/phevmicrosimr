@@ -27,6 +27,24 @@ getEVAdoption1 <- function(abm){
   return(adoption[,c(1,3,5,6)])
 }
 
+#' vkt_factor
+#' 
+#' a simple mileage reduction factor based on fuel price and demand reduction measures
+#'
+#' @param price_elasticity travel demand elasticity
+#' @param price prevailing price future fuel price
+#' @param demand_reduction prevailing demand_reduction demand reduction due to non-price measures - active travel, congestion charging etc e.g. 0.95
+#'
+#' @return vkt factor 0-1
+#' @export
+#'
+#' @examples
+vkt_factor_fun <- function(price_elasticity,price,demand_reduction){
+  #fuelprices %>% group_by(year=year(date)) %>% summarise(price=mean(diesel+petrol)/2) 2018 mean price
+  return((price/1.38)^price_elasticity*(1-demand_reduction))
+  
+}
+
 
 #' getEmissions
 #' 
@@ -39,53 +57,57 @@ getEVAdoption1 <- function(abm){
 #' @param average_over_runs if FALSE return individual run emissions, otherwise average over runs
 #' @param emissions_start_date start date for cumulative emissions calculation
 #'
-#' @return
+#' @return a dataframe 
 #' @export
 #'
 #' @examples
-getEmissions <- function(abm, addvars=NULL, xi=1,epsilon = 0, average_over_runs=F,emissions_start_date=NULL){
+getEmissions <- function(abm, addvars=NULL, xi=1,epsilon = 0,average_over_runs=F,emissions_start_date=NULL){
   #returns the EV adoption rate across runs
-  
-  mileage_elastic <- function(epsilon,qev34,price){
-    
-    return(mileage_vals[qev34]*(price/1.40)^epsilon)
-    
-  }
-  
+
   year_zero <- 2015
   y_zero <- lubridate::ymd(paste(year_zero,1,1))
-  end_year <-  filter(abm[["system"]],parameter=="end_year")$value
+  end_year <-  dplyr::filter(abm[["system"]],parameter=="end_year")$value
   Nt <- (end_year+1-year_zero)*12
-  date_tab <- tibble(t=1:Nt)
-  date_tab <- date_tab %>% mutate(date=y_zero+months(t-1))
-  date_tab <- date_tab %>% mutate(diesel=fuel_price_fun1("diesel",abm[[2]],decimal_date(date)),gasoline=fuel_price_fun1("gasoline",abm[[2]],decimal_date(date)))
-  abm.e <- inner_join(abm[[1]],date_tab,by="t") %>% dplyr::select(ID,date,simulation,type,AER,qev34,diesel,gasoline,WLTP)
+  date_tab <- tibble::tibble(t=1:Nt)
+  date_tab <- date_tab %>% dplyr::mutate(date=y_zero+months(t-1))
+  date_tab <- date_tab %>% dplyr::mutate(vkt_fact=1-vkt_reduction_fun(abm[[2]],lubridate::decimal_date(date)))
+  date_tab <- date_tab %>% dplyr::mutate(diesel=fuel_price_fun1("diesel",abm[[2]],lubridate::decimal_date(date)),petrol=fuel_price_fun1("gasoline",abm[[2]],lubridate::decimal_date(date)))
+  date_tab <- date_tab %>% dplyr::mutate(vkt_factor_diesel=vkt_factor_fun(epsilon,diesel,vkt_reduction_fun(abm[[2]],lubridate::decimal_date(date))))
+  date_tab <- date_tab %>% dplyr::mutate(vkt_factor_petrol=vkt_factor_fun(epsilon,petrol,vkt_reduction_fun(abm[[2]],lubridate::decimal_date(date))))
+  abm.e <- dplyr::inner_join(abm[[1]],date_tab,by="t") %>% dplyr::select(ID,date,simulation,type,AER,qev34,diesel,petrol,vkt_fact,vkt_factor_diesel,vkt_factor_petrol,wltp)
   #real-world emissions
-  abm.e <- abm.e %>% arrange(simulation,date,ID)
-  abm.e <- abm.e %>% mutate(mileage=mileage_vals[qev34]) 
-  abm.e <- abm.e %>% dplyr::mutate(e=WLTP)  #add adustment?
-  if(epsilon != 0){
-  abm.e <- abm.e %>% dplyr::rowwise() %>% mutate(mileage=replace(mileage,type %in% c("diesel"),mileage_elastic(epsilon,qev34,diesel) ))
-  abm.e <- abm.e %>% dplyr::rowwise() %>% mutate(mileage=replace(mileage,type %in% c("gasoline","hev"),mileage_elastic(epsilon,qev34,gasoline) ))
-  }
-  abm.p <- abm.e %>% filter(type=="phev") %>% dplyr::mutate(e=replace(e,type=="phev",e_phev(WLTP,AER,mileage,xi)))
-  abm.e <- bind_rows(filter(abm.e, type != "phev"),abm.p) %>% arrange(simulation,date,ID)
+  abm.e <- abm.e %>% dplyr::arrange(simulation,date,ID)
+  abm.e <- abm.e %>% dplyr::mutate(mileage=mileage_vals[qev34]) 
+  abm.e <- abm.e %>% dplyr::mutate(e=wltp)  #add adustment?
+  abm.e <- abm.e %>% dplyr::filter(type != "bev") #no need to include bevs
+  #if(epsilon != 0){
+  #abm.e <- abm.e %>% dplyr::rowwise() %>% dplyr::mutate(mileage=replace(mileage,type %in% c("diesel"),mileage*vkt_factor_diesel))
+  abm.d <- abm.e %>% dplyr::filter(type=="diesel") %>% dplyr::mutate(mileage=mileage*vkt_factor_diesel)
+  abm.h <- abm.e %>% dplyr::filter(type %in% c("petrol","hev"))  %>% dplyr::mutate(mileage=mileage*vkt_factor_petrol)
+  #abm.e <- abm.e %>% dplyr::rowwise() %>% dplyr::mutate(mileage=replace(mileage,type %in% c("petrol","hev"),mileage*vkt_factor_petrol))
+  #assume that phev driver mileages reflect travel demand reduction measures but not price elasticity
+    #}
+  abm.p <- abm.e  %>% dplyr::filter(type=="phev") 
+  #the order here is important
+  abm.p <- abm.p %>% dplyr::rowwise() %>% dplyr::mutate(mileage=mileage*vkt_fact)
+  abm.p <- abm.p  %>% dplyr::rowwise() %>% dplyr::mutate(e=e_phev(wltp,AER,mileage,xi))
+  abm.e <- dplyr::bind_rows(abm.d,abm.h,abm.p) %>% dplyr::arrange(simulation,date,ID)
   #abm.e <- abm.e %>% rowwise() %>% dplyr::mutate(e=replace(e,type=="phev",e_phev(WLTP,AER,mileage_vals[qev34],xi)))
-  abm.e <- abm.e %>% group_by_at(c("date","simulation",addvars)) %>% dplyr::summarise(WLTP_mean=mean(WLTP) ,e_real=mean(e), tCO2=sum(e*mileage)/1e+6/924)
-  abm.e <- distinct(abm.e)
+  abm.e <- abm.e %>% dplyr::group_by_at(c("date","simulation",addvars)) %>% dplyr::summarise(wltp_mean=mean(wltp) ,e_real=mean(e), tCO2=sum(e*mileage)/1e+6/924)
+  abm.e <- dplyr::distinct(abm.e)
   #abm.e <- inner_join(abm.e,date_tab,by="") %>% ungroup() %>% select("simulation","date",addvars,"WLTP_mean","e_real","tCO2")
-  abm.e <- abm.e %>% ungroup() %>% select("simulation","date",addvars,"WLTP_mean","e_real","tCO2")
+  abm.e <- abm.e %>% dplyr::ungroup() %>% dplyr::select("simulation","date",all_of(addvars),"wltp_mean","e_real","tCO2")
 
   #average over runs
   if(average_over_runs){
-   abm.e <- abm.e %>% group_by_at(c("date",addvars)) %>% summarise(e_real=mean(e_real),tCO2=mean(tCO2))
-   abm.e <- abm.e %>% group_by_at(addvars) %>% mutate(cumulative_tCO2=cumsum(tCO2))
+   abm.e <- abm.e %>% dplyr::group_by_at(c("date",addvars)) %>% dplyr:summarise(e_real=mean(e_real),tCO2=mean(tCO2))
+   abm.e <- abm.e %>% dplyr::group_by_at(addvars) %>% dplyr::mutate(cumulative_tCO2=cumsum(tCO2))
    if(!is.null(emissions_start_date)){
-    abm0 <- filter(abm.e, date==emissions_start_date) %>% select(type,cumulative_tCO2)
+    abm0 <- dplyr::filter(abm.e, date==emissions_start_date) %>% dplyr::select(type,cumulative_tCO2)
     names(abm0)[2] <- "offset"
-    abm.e <- inner_join(abm.e,abm0,by="type")
-    abm.e <- abm.e %>% filter(date >= emissions_start_date) %>% group_by_at(addvars) %>% mutate(cumulative_tCO2=cumulative_tCO2-offset)
-    abm.e <- abm.e %>% select(-offset)
+    abm.e <- dplyr::inner_join(abm.e,abm0,by="type")
+    abm.e <- abm.e %>% dplyr::filter(date >= emissions_start_date) %>% dplyr::group_by_at(addvars) %>% dplyr::mutate(cumulative_tCO2=cumulative_tCO2-offset)
+    abm.e <- abm.e %>% dplyr::select(-offset)
     }
   }
   return(abm.e)
@@ -329,19 +351,42 @@ getZEVSales <- function(abm){
 
 #' getActivity
 #' 
-#' annual activity (km) by powertrain type
+#' annual activity (km) by powertrain type including impact of VKT policy and price elasticity
 #'
 #' @param abm output of runABM
+#' @param epsilon price elasticity
+#' @param xi0 phev charging behaviour (one of 0.5,1.0,1.5,2.0)
 #'
 #' @return dataframe type, year, activity
 #' @export
 #'
 #' @examples
-getActivity <- function(abm){
+getActivity <- function(abm,epsilon=-0.15,xi0=1.0){
 
+ year_zero <- 2015
  y_zero <- lubridate::ymd(paste(year_zero,1,1))
  Nrun <- dplyr::filter(abm[[3]],parameter=="Nrun")$value
- activity <- abm[[1]] %>% dplyr::group_by(type,year=lubridate::year(y_zero+months(t-1))) %>% dplyr::summarise(activity=sum(mileage_vals[qev34]/(12*20)))
+ end_year <-  dplyr::filter(abm[["system"]],parameter=="end_year")$value
+ Nt <- (end_year+1-year_zero)*12
+ date_tab <- tibble::tibble(t=1:Nt)
+ date_tab <- date_tab %>% dplyr::mutate(date=y_zero+months(t-1))
+ date_tab <- date_tab %>% dplyr::mutate(vkt_fact=1-vkt_reduction_fun(abm[[2]],lubridate::decimal_date(date)))
+ date_tab <- date_tab %>% dplyr::mutate(diesel=fuel_price_fun1("diesel",abm[[2]],lubridate::decimal_date(date)),petrol=fuel_price_fun1("gasoline",abm[[2]],lubridate::decimal_date(date)))
+ date_tab <- date_tab %>% dplyr::mutate(vkt_factor_diesel=vkt_factor_fun(epsilon,diesel,vkt_reduction_fun(abm[[2]],lubridate::decimal_date(date))))
+ date_tab <- date_tab %>% dplyr::mutate(vkt_factor_petrol=vkt_factor_fun(epsilon,petrol,vkt_reduction_fun(abm[[2]],lubridate::decimal_date(date))))
+ abm.e <- dplyr::inner_join(abm[[1]],date_tab,by="t") %>% dplyr::select(ID,date,simulation,type,qev34,diesel,petrol,vkt_fact,vkt_factor_diesel,vkt_factor_petrol,AER)
+ abm.e <- abm.e %>% mutate(mileage=dplyr::case_when(type == "bev"~mileage_vals[qev34]*vkt_fact,
+                                                    type == "phev"~mileage_vals[qev34]*vkt_fact,
+                                                    type == "diesel"~mileage_vals[qev34]*vkt_factor_diesel,
+                                                    type == "petrol"~mileage_vals[qev34]*vkt_factor_petrol,
+                                                    type == "hev"~mileage_vals[qev34]*vkt_factor_petrol))
+ #separate PHEV activity into electric and icev
+ abm.p <- abm.e  %>% dplyr::filter(type=="phev") 
+ abm.p$type <- "phev_elec"
+ #electric miles
+ abm.p <- abm.p %>% dplyr::rowwise() %>% dplyr::mutate(mileage=uf_phev_interp(mileage,xi0,AER)*mileage)
+ abm.e <- dplyr::bind_rows(abm.e,abm.p) %>% dplyr::arrange(simulation,date,ID)
+ activity <- abm.e %>% dplyr::group_by(type,year=lubridate::year(date)) %>% dplyr::summarise(activity=sum(mileage/(12*Nrun)))
  return(activity) 
 }
 

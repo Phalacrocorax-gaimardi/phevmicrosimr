@@ -65,9 +65,11 @@ grant_fun <- function(type,sD,yeartime) {
 #' @examples
 flagr <- function(yeartime){
   
-  if(yeartime >= 2022) return("new")
-  if(yeartime < 2021)  return("old")
-  if(yeartime >=2021 & yeartime < 2022) return("2021")
+  flag <- dplyr::case_when(yeartime >= 2022~"new",
+  yeartime < 2021~"old",
+  (yeartime >=2021 & yeartime < 2022)~"2021"
+  )
+  return(flag)
 }
 
 
@@ -127,7 +129,9 @@ excise_duty_fun <- function(type,sD, yeartime) {
   excise_gasoline_2050 <- dplyr::filter(sD, parameter=="excise_gasoline_2050")$value
   
   excise <- dplyr::case_when(type=="diesel"~stats::approx(c(lubridate::decimal_date(rev(fuelprices$date)),2031,2051),c(rev(fuelprices$dieselexcise)/100,excise_diesel_2030,excise_diesel_2050),xout=yeartime,rule=2)$y,
-                             type=="gasoline"~stats::approx(c(lubridate::decimal_date(rev(fuelprices$date)),2031,2051),c(rev(fuelprices$petrolexcise)/100,excise_gasoline_2030,excise_gasoline_2050),xout=yeartime,rule=2)$y)
+                             type=="gasoline"~stats::approx(c(lubridate::decimal_date(rev(fuelprices$date)),2031,2051),c(rev(fuelprices$petrolexcise)/100,excise_gasoline_2030,excise_gasoline_2050),xout=yeartime,rule=2)$y,
+                             type=="petrol"~stats::approx(c(lubridate::decimal_date(rev(fuelprices$date)),2031,2051),c(rev(fuelprices$petrolexcise)/100,excise_gasoline_2030,excise_gasoline_2050),xout=yeartime,rule=2)$y
+                             )
   
   return(excise)
 
@@ -210,11 +214,11 @@ motor_tax_old <- function(emissions){
 #' @examples
 motor_tax <- function(emissions,flag){
 
-  if(emissions < 0) {warning('negative emissions. Adjusting to zero'); emissions <- 0}
+  #if(emissions < 0) {warning('negative emissions. Adjusting to zero'); emissions <- 0}
   #ifelse(emission == 0, return(120),
-  if(flag !="old") return(new_motortax_bands$motor[cut(emissions,new_motortax_bands$lower,right=F,labels=F)])
-  if(flag=="old") return(motortaxbands$motor[cut(emissions/wltp_nedc_ratio,motortaxbands$lower,labels=F)])
-
+  tax <- dplyr::case_when(flag !="old"~new_motortax_bands$motor[cut(emissions,new_motortax_bands$lower,right=F,labels=F)],
+  flag=="old"~motortaxbands$motor[cut(emissions/wltp_nedc_ratio,motortaxbands$lower,labels=F)])
+  return(tax)
 
 }
 
@@ -442,7 +446,28 @@ bev_rrp_full <- function(rrp_incentive,params){
   
   f <- function(r) {r -zev_grant(r) -vrt_rebate("bev",0.9*r,params)-rrp_incentive}
   return(uniroot(f, interval=c(rrp_incentive*0.8,2*rrp_incentive))$root)
-  
 }
+  
 
-
+  
+  #' VKT reduction
+  #'
+  #' Reduction factor of vehicle kilometers travelled as a function of mileage
+  #'
+  #' @param sD scenario dataframe
+  #' @param yeartime decimal time
+  #'
+  #' @return  dimensionless fraction
+  #' @export
+  #'
+  #' @examples
+  vkt_reduction_fun <- function(sD,yeartime){
+    
+    vkt_2030 <- dplyr::filter(sD, parameter=="demand_destruction_2030")$value
+    vkt_2050 <- dplyr::filter(sD, parameter=="demand_destruction_2050")$value
+    
+    return(stats::approx(x=c(2019,2031,2051), y=c(0,vkt_2030,vkt_2050),xout=yeartime,rule = 2)$y)
+    
+    
+  }
+  

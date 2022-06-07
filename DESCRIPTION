@@ -1,7 +1,7 @@
 Package: phevmicrosimr
 Type: Package
 Title: Simulates ZEV adoption in Ireland 2015-2050
-Version: 2.0.0
+Version: 2.0.1
 Author: Joe Wheatley
 Maintainer: The package maintainer <joe.wheatley@ucd.ie>
 Description: Agent-based micro-simulation of ZEV adoption based on detailed policy and technology scenarios.This packages contains functions to load a run a pre-calibrated model. Functions to handle policy scenarios are in policy.R. Functions to deal with market scenarios are in market.R. Functions to deal with BEV technology are in technology.R. Good luck!
@@ -25,5 +25,6 @@ Imports:
     tidyr,
     foreach,
     doParallel,
-    cluster
+    cluster,
+    pracma
 Roxygen: list(markdown = TRUE)

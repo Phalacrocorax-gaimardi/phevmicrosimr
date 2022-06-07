@@ -21,7 +21,7 @@ uf <- function(AER){
 
 #' e_ice
 #' 
-#' emissions from a charged depleted phev based in European utility factor with behavioural adjustment xi
+#' emissions from a charged depleted phev based in European utility factor
 #'
 #' @param wltp WLTP quoted emissions for phev
 #' @param AER all electric range 
@@ -43,7 +43,7 @@ e_ice <- function(wltp,AER){
 #'
 #' @param wltp WLTP quoted emissions for phev
 #' @param AER all electric range 
-#' @param mileage km from mileage_vals
+#' @param mileage annual km
 #' @param xi charging behaviour 0.25,0.5,0.75,1
 #'
 #' @return gCO2/km
@@ -52,10 +52,9 @@ e_ice <- function(wltp,AER){
 #' @examples
 e_phev <- function(wltp,AER, mileage, xi=1){
   #
-  wltp*(1-uf_phev(mileage,xi,AER))/(1-uf(AER))
+  wltp*(1-uf_phev_interp(mileage,xi,AER))/(1-uf(AER))
   
 }
-
 
 
 #' uf_phev
@@ -74,6 +73,32 @@ uf_phev <- function(mileage1,xi1,AER){
   c <- c[,3:13] %>% as.numeric()
   uf <- sapply(1:11, function(i) c[i]*(AER/50)^(i-1) ) %>% sum()
   uf <- 1- exp(uf)
+  return(uf)
+  
+}
+
+
+#' uf_phev_interp
+#' 
+#' fast, interpolated phev utilisation factor
+#'
+#' @param mileage1 kms, any mileage <=60000
+#' @param xi1 charging behaviour allowed values 0.5,1,1.5,2
+#' @param AER electric range km
+#'
+#' @return real
+#' @export
+#'
+#' @examples
+uf_phev_interp <- function(mileage1,xi1,AER){
+  
+  x <- c(0,mileage_vals)
+  y <- 1:200 #AERs
+  uf <- dplyr::case_when(xi1==0.5~pracma::interp2(y  = y, x  = x, Z = uf_interp_data_xi_0.5,xp = mileage1,yp=AER),
+                   xi1==1.0~pracma::interp2(y  = y, x  = x, Z = uf_interp_data_xi_1.0,xp = mileage1,yp=AER),
+                   xi1==1.5~pracma::interp2(y  = y, x  = x, Z = uf_interp_data_xi_1.5,xp = mileage1,yp=AER),
+                   xi1==2.0~pracma::interp2(y  = y, x  = x, Z = uf_interp_data_xi_2.0,xp = mileage1,yp=AER)
+                   )
   return(uf)
   
 }

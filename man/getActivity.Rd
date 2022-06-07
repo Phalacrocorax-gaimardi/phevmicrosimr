@@ -4,14 +4,18 @@
 \alias{getActivity}
 \title{getActivity}
 \usage{
-getActivity(abm)
+getActivity(abm, epsilon = -0.15, xi0 = 1)
 }
 \arguments{
 \item{abm}{output of runABM}
+
+\item{epsilon}{price elasticity}
+
+\item{xi0}{phev charging behaviour (one of 0.5,1.0,1.5,2.0)}
 }
 \value{
 dataframe type, year, activity
 }
 \description{
-annual activity (km) by powertrain type
+annual activity (km) by powertrain type including impact of VKT policy and price elasticity
 }

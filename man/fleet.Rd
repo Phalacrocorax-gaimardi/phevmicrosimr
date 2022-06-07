@@ -5,7 +5,7 @@
 \alias{fleet}
 \title{2021 passenger car models}
 \format{
-A data frame with 244 rows and 17 variables:
+A data frame with 284 rows and 17 variables:
 \describe{
 \item{make}{manufacturer}
 \item{model}{model}

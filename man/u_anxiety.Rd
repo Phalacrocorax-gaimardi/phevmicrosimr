@@ -4,7 +4,7 @@
 \alias{u_anxiety}
 \title{u_anxiety}
 \usage{
-u_anxiety(mileage, AER, shape = 2.5, anxiety)
+u_anxiety(mileage, AER, shape = 2.5, anxiety, a_prefactor = 1)
 }
 \arguments{
 \item{mileage}{annual mileage in km}
@@ -14,12 +14,14 @@ u_anxiety(mileage, AER, shape = 2.5, anxiety)
 \item{shape}{gamma distribution}
 
 \item{anxiety}{range anxiety. 1 is non-anxious case, > 1 is anxious case}
+
+\item{a_prefactor}{const of order 1}
 }
 \value{
 probabilty that a daily trip exceeds AER
 }
 \description{
-Range anxiety is assumed to reflect the probability that the daily trip exceeds the electric vehicle AER, requiring a charge.
+Range anxiety is assumed to reflect the probability that a daily trip exceeds the electric vehicle AER, requiring an intraday charge.
 the distribution of daily trips is gamma distributed with shape parameter 2.5. subjectivity via "anxiety" parameter anxiety
 }
 \examples{

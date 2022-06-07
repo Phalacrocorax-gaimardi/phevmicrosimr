@@ -8,7 +8,7 @@
 #' Prices are from 2021 price list where possible, however e.g. Audi and BMW prices were adjusted 2020 prices.
 #'
 #' 
-#' @format A data frame with 244 rows and 17 variables:
+#' @format A data frame with 284 rows and 17 variables:
 #' \describe{
 #'   \item{make}{manufacturer}
 #'   \item{model}{model}
